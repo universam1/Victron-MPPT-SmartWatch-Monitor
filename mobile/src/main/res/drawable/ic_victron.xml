@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stylised PV panel with a sun: the app is a solar charger monitor. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#1B1B1F"
+        android:pathData="M0,0h48v48H0z" />
+    <path
+        android:fillColor="#FFC531"
+        android:pathData="M24,8m-6,0a6,6 0 1,0 12,0a6,6 0 1,0 -12,0" />
+    <path
+        android:fillColor="#4FC3F7"
+        android:pathData="M12,22h24l6,14H6z" />
+    <path
+        android:fillColor="#1B1B1F"
+        android:pathData="M22,22h4l1,14h-6z M13.5,26.5h21v1.5h-21z M11,31h26v1.5H11z" />
+</vector>

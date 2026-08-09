@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Victron Monitor</string>
+    <string name="tile_label">Victron</string>
+    <string name="tile_description">Solarladeregler auf einen Blick</string>
+
+    <string name="overview_title">Victron</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="devices_title">Geräte</string>
+    <string name="debug_title">Rohdaten</string>
+
+    <string name="action_settings">Einstellungen</string>
+    <string name="action_rescan">Jetzt scannen</string>
+    <string name="action_add_key">Schlüssel eingeben</string>
+    <string name="action_edit_key">Schlüssel ändern</string>
+    <string name="action_remove">Entfernen</string>
+    <string name="action_save">Speichern</string>
+    <string name="action_debug">Rohdaten</string>
+
+    <string name="empty_no_devices">Noch kein Victron-Gerät</string>
+    <string name="empty_hint">„Instant readout“ in VictronConnect aktivieren, dann scannen.</string>
+    <string name="scanning">Suche…</string>
+
+    <string name="permission_needed">Berechtigung für Bluetooth-Suche nötig</string>
+    <string name="permission_grant">Berechtigung erteilen</string>
+    <string name="bluetooth_off">Bluetooth ist aus</string>
+    <string name="no_ble">Diese Uhr hat kein Bluetooth LE</string>
+
+    <string name="status_missing_key">Kein Schlüssel – zum Eingeben tippen</string>
+    <string name="status_key_mismatch">Schlüssel passt nicht</string>
+    <string name="status_undecoded">Record-Typ noch nicht unterstützt</string>
+
+    <string name="label_battery">Batterie</string>
+    <string name="label_pv">Solar</string>
+    <string name="label_yield_today">Ertrag heute</string>
+    <string name="label_state">Zustand</string>
+    <string name="label_error">Fehler</string>
+    <string name="label_load">Last</string>
+    <string name="label_signal">Signal</string>
+    <string name="label_age">Alter</string>
+    <string name="label_model">Modell</string>
+    <string name="label_address">Adresse</string>
+    <string name="label_record">Record</string>
+
+    <string name="key_entry_title">Instant-Readout-Schlüssel</string>
+    <string name="key_entry_hint">32 Hex-Zeichen aus VictronConnect</string>
+    <string name="key_entry_invalid">Schlüssel muss 32 Hex-Zeichen haben</string>
+
+    <string name="background_scan_on">Hintergrund-Scan: ein</string>
+    <string name="background_scan_off">Hintergrund-Scan: aus</string>
+    <string name="background_scan_hint">Aktualisiert die Tile etwa alle 15 Minuten.</string>
+</resources>

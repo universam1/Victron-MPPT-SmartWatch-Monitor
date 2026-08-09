@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Victron Monitor</string>
+    <string name="tile_label">Victron</string>
+    <string name="tile_description">Solar charger at a glance</string>
+
+    <string name="overview_title">Victron</string>
+    <string name="settings_title">Settings</string>
+    <string name="devices_title">Devices</string>
+    <string name="debug_title">Raw data</string>
+
+    <string name="action_settings">Settings</string>
+    <string name="action_rescan">Scan now</string>
+    <string name="action_add_key">Enter key</string>
+    <string name="action_edit_key">Change key</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_save">Save</string>
+    <string name="action_debug">Raw data</string>
+
+    <string name="empty_no_devices">No Victron device yet</string>
+    <string name="empty_hint">Enable “Instant readout” in VictronConnect, then scan.</string>
+    <string name="scanning">Scanning…</string>
+
+    <string name="permission_needed">Bluetooth scanning permission is required</string>
+    <string name="permission_grant">Grant permission</string>
+    <string name="bluetooth_off">Bluetooth is off</string>
+    <string name="no_ble">This watch has no Bluetooth LE</string>
+
+    <string name="status_missing_key">No key — tap to enter</string>
+    <string name="status_key_mismatch">Key does not match</string>
+    <string name="status_undecoded">Record type not supported yet</string>
+
+    <string name="label_battery">Battery</string>
+    <string name="label_pv">Solar</string>
+    <string name="label_yield_today">Yield today</string>
+    <string name="label_state">State</string>
+    <string name="label_error">Error</string>
+    <string name="label_load">Load</string>
+    <string name="label_signal">Signal</string>
+    <string name="label_age">Age</string>
+    <string name="label_model">Model</string>
+    <string name="label_address">Address</string>
+    <string name="label_record">Record</string>
+
+    <string name="key_entry_title">Advertisement key</string>
+    <string name="key_entry_hint">32 hex characters from VictronConnect</string>
+    <string name="key_entry_invalid">Key must be 32 hex characters</string>
+
+    <string name="background_scan_on">Background scan: on</string>
+    <string name="background_scan_off">Background scan: off</string>
+    <string name="background_scan_hint">Refreshes the tile about every 15 minutes.</string>
+</resources>

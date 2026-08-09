@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Victron Monitor</string>
+
+    <string name="devices">Devices</string>
+    <string name="scanning">Scanning…</string>
+    <string name="scan_now">Scan now</string>
+    <string name="empty_hint">Enable “Instant readout” for the device in VictronConnect, then scan. Devices show up here even before you enter a key.</string>
+
+    <string name="permission_needed">Bluetooth scanning permission is required</string>
+    <string name="permission_grant">Grant permission</string>
+    <string name="bluetooth_off">Bluetooth is off</string>
+    <string name="no_ble">No Bluetooth LE on this device</string>
+
+    <string name="key_label">Advertisement key (32 hex characters)</string>
+    <string name="key_invalid">Key must be 32 hex characters</string>
+    <string name="key_save">Save key</string>
+    <string name="key_remove">Remove device</string>
+    <string name="key_hint">VictronConnect → device → Settings → Product info → “Instant readout via Bluetooth” → Encryption data</string>
+
+    <string name="background_scan">Background scan (~15 min)</string>
+
+    <string name="status_missing_key">No key yet</string>
+    <string name="status_key_mismatch">Key does not match this device</string>
+    <string name="status_undecoded">Record type not supported yet</string>
+
+    <string name="label_pv">Solar</string>
+    <string name="label_battery">Battery</string>
+    <string name="label_yield_today">Yield today</string>
+    <string name="label_state">State</string>
+    <string name="label_error">Error</string>
+    <string name="label_load">Load</string>
+    <string name="label_age">Age</string>
+    <string name="label_signal">Signal</string>
+    <string name="label_payload">Decrypted payload</string>
+</resources>

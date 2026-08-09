@@ -1,0 +1,20 @@
+services:
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: victron-monitor-build:latest
+    working_dir: /workspace
+    volumes:
+      # The repository itself.
+      - ..:/workspace
+      # Keep the Gradle cache between runs so a rebuild takes seconds, not minutes.
+      - gradle-cache:/home/builder/.gradle
+    environment:
+      # Gradle inside a container: no daemon, and no interactive console.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
+    # `docker compose run build <command>` overrides this.
+    command: ./gradlew tasks
+
+volumes:
+  gradle-cache:
