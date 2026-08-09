@@ -36,7 +36,7 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :wear:assembleDebug :mobile:assembleDebug
+      - run: ./gradlew :data:testDebugUnitTest :wear:assembleDebug :mobile:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: apks

@@ -9,7 +9,8 @@ android {
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "de.universam.victron.mobile"
+        // Same id as the watch app on purpose — see wear/build.gradle.kts.
+        applicationId = "de.universam.victron"
         minSdk = libs.versions.minSdkMobile.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1

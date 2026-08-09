@@ -13,4 +13,22 @@
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="true" />
+
+    <application>
+        <!--
+          Receives the device list (including the advertisement keys) from the counterpart app over
+          the Wear OS Data Layer. Both apps ship this service, so the sync works in both directions.
+        -->
+        <service
+            android:name="de.universam.victron.data.sync.ConfigSyncListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/victron" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

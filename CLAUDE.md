@@ -54,7 +54,16 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   screen. Don't throw it away and don't guess a layout.
 - Keys are matched by address first, then by the plaintext key-check byte (first key byte). Keep the
   fallback — it is what makes a changed BLE address harmless.
-- Formatting lives in `data/Formatting.kt` only, so a value looks the same in app, tile and phone.
+- Formatting lives in `data/Formatting.kt` only, and colours in `data/VictronPalette.kt` only (ARGB
+  ints, because the tile knows nothing about Compose). App and tile must never diverge.
+- **Both apps keep `applicationId = de.universam.victron`** and the same signing key. The Wear OS
+  Data Layer namespaces data items per package + signature — change one id and the key sync stops
+  working silently. Module `namespace`s stay distinct (`.wear` / `.mobile`).
+- **Config sync is a per-device last-write-wins union** (`AppConfig.mergeDevices`). Do not "fix" it
+  into a wholesale replace: that lets one device wipe the other's keys. Removals are intentionally
+  not propagated; `backgroundScanEnabled`/scan window stay local per device.
+- The gauge scale comes from `DeviceSnapshot.pvScaleMaxW`: configured array size, else the observed
+  peak rounded up, floor 50 W. `carryOver` must keep `observedPvPeakW` across advertisements.
 
 ## Conventions
 

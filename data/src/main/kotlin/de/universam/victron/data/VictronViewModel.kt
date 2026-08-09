@@ -56,7 +56,24 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
     private var scanJob: Job? = null
 
     init {
-        viewModelScope.launch { repository.loadCachedSnapshots() }
+        viewModelScope.launch {
+            repository.loadCachedSnapshots()
+            // Pick up whatever the counterpart device published while this app was closed.
+            repository.syncNow()
+        }
+    }
+
+    /** Exchanges the device list with the paired phone/watch right now. */
+    public fun syncNow() {
+        viewModelScope.launch { repository.syncNow() }
+    }
+
+    /** Full scale of the power arc in watts; `0` derives it from the highest power seen. */
+    public fun setPvPeakWatts(address: String, watts: Int) {
+        val existing = config.value.deviceFor(address) ?: return
+        viewModelScope.launch {
+            repository.upsertDevice(existing.copy(pvPeakWatts = watts.coerceAtLeast(0)))
+        }
     }
 
     /** Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly. */
@@ -104,8 +121,10 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         val normalized = keyHex.filterNot { it == ' ' || it == ':' || it == '-' }.lowercase()
         if (runCatching { VictronCipher.parseKey(normalized) }.isFailure) return false
         viewModelScope.launch {
+            val existing = config.value.deviceFor(address)
             repository.upsertDevice(
-                DeviceConfig(address = address, advertisementKeyHex = normalized, label = label),
+                existing?.copy(advertisementKeyHex = normalized, label = label ?: existing.label)
+                    ?: DeviceConfig(address = address, advertisementKeyHex = normalized, label = label),
             )
             // Pick the new key up immediately.
             if (scanJob?.isActive == true) {

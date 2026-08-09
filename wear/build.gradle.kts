@@ -9,7 +9,9 @@ android {
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "de.universam.victron.wear"
+        // Both apps must share this id (and be signed with the same key) or the Wear OS Data
+        // Layer keeps them in separate namespaces and the key sync silently does nothing.
+        applicationId = "de.universam.victron"
         minSdk = libs.versions.minSdkWear.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1

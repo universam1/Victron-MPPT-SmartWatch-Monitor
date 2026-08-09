@@ -1,11 +1,13 @@
 package de.universam.victron.data
 
+import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataStore
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceConfig
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.SnapshotCache
+import de.universam.victron.data.sync.ConfigSync
 import de.universam.victron.protocol.DecodeResult
 import de.universam.victron.protocol.ParseResult
 import de.universam.victron.protocol.VictronAdvertisement
@@ -28,6 +30,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * lunch".
  */
 public class VictronRepository internal constructor(
+    private val context: Context,
     private val scanner: VictronScanner,
     private val configStore: DataStore<AppConfig>,
     private val snapshotStore: DataStore<SnapshotCache>,
@@ -91,7 +94,8 @@ public class VictronRepository internal constructor(
 
         scanner.advertisements(aggressiveness).collect { raw ->
             val snapshot = decode(raw, currentConfig, keys) ?: return@collect
-            _snapshots.value = _snapshots.value + (snapshot.address.uppercase() to snapshot)
+            val address = snapshot.address.uppercase()
+            _snapshots.value = _snapshots.value + (address to snapshot.carryOver(_snapshots.value[address]))
             onSnapshot(snapshot)
         }
     }
@@ -133,25 +137,28 @@ public class VictronRepository internal constructor(
     // ---- configuration -------------------------------------------------------------------
 
     public suspend fun upsertDevice(device: DeviceConfig) {
-        configStore.updateData { config ->
-            val others = config.devices.filterNot { it.address.equals(device.address, ignoreCase = true) }
-            config.copy(devices = others + device)
+        val stamped = device.copy(updatedAtEpochMillis = System.currentTimeMillis())
+        val merged = configStore.updateData { config ->
+            val others = config.devices.filterNot { it.address.equals(stamped.address, ignoreCase = true) }
+            config.copy(devices = others + stamped)
         }
-        // The label may have changed; keep the in-memory snapshot consistent.
-        val label = device.label
+        // Keep the in-memory snapshot label consistent with the new configuration.
         _snapshots.value = _snapshots.value.mapValues { (_, snapshot) ->
-            if (snapshot.address.equals(device.address, ignoreCase = true)) {
-                snapshot.copy(label = label)
+            if (snapshot.address.equals(stamped.address, ignoreCase = true)) {
+                snapshot.copy(label = stamped.label)
             } else {
                 snapshot
             }
         }
+        ConfigSync.push(context, merged.devices, System.currentTimeMillis())
     }
 
     public suspend fun removeDevice(address: String) {
         configStore.updateData { config ->
             config.copy(devices = config.devices.filterNot { it.address.equals(address, ignoreCase = true) })
         }
+        // Not pushed on purpose: the sync is a union merge, so a removal cannot be expressed.
+        // Remove the device on the other side too if you want it gone there.
     }
 
     public suspend fun setBackgroundScanEnabled(enabled: Boolean) {
@@ -160,6 +167,27 @@ public class VictronRepository internal constructor(
 
     public suspend fun setScanWindowSeconds(seconds: Int) {
         configStore.updateData { it.copy(scanWindowSeconds = seconds.coerceIn(5, 60)) }
+    }
+
+    // ---- phone <-> watch sync ------------------------------------------------------------
+
+    /**
+     * Merges a device list received from the counterpart device and, if this side knows more,
+     * publishes the merge result so both ends converge.
+     */
+    public suspend fun mergeSyncedDevices(remote: List<DeviceConfig>) {
+        if (remote.isEmpty()) return
+        val merged = configStore.updateData { it.mergeDevices(remote) }
+        Log.d(TAG, "Merged ${remote.size} synced device(s); now ${merged.devices.size}")
+        if (merged.hasNewerThan(remote)) {
+            ConfigSync.push(context, merged.devices, System.currentTimeMillis())
+        }
+    }
+
+    /** Pulls whatever the counterpart published and pushes the local list. Call it on app start. */
+    public suspend fun syncNow() {
+        mergeSyncedDevices(ConfigSync.pull(context))
+        ConfigSync.push(context, configStore.data.first().devices, System.currentTimeMillis())
     }
 
     internal companion object {

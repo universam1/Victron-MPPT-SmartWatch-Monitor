@@ -64,13 +64,51 @@ public data class DeviceSnapshot(
     val solarCharger: SolarChargerValues? = null,
     /** Decrypted payload of a record type we cannot decode yet, as hex. */
     val payloadHex: String? = null,
+    /** Highest PV power ever seen from this device, used to scale the power arc automatically. */
+    val observedPvPeakW: Int = 0,
 ) {
     /** What to call this device in the UI. */
     public val displayName: String get() = label?.takeIf { it.isNotBlank() } ?: modelName
 
     public fun ageMillis(nowEpochMillis: Long): Long = (nowEpochMillis - receivedAtEpochMillis).coerceAtLeast(0)
 
+    /** Keeps values that survive a single advertisement, like the observed peak. */
+    public fun carryOver(previous: DeviceSnapshot?): DeviceSnapshot {
+        val peak = maxOf(
+            previous?.observedPvPeakW ?: 0,
+            observedPvPeakW,
+            solarCharger?.pvPowerW ?: 0,
+        )
+        return if (peak == observedPvPeakW) this else copy(observedPvPeakW = peak)
+    }
+
+    /**
+     * Full scale of the power arc. A configured peak wins; otherwise the highest power seen so far
+     * is rounded up to something a human would draw a scale to, with a 50 W floor so a dark morning
+     * does not make 3 W look like a full array.
+     */
+    public fun pvScaleMaxW(configuredPeakWatts: Int): Int {
+        if (configuredPeakWatts > 0) return configuredPeakWatts
+        val observed = maxOf(observedPvPeakW, solarCharger?.pvPowerW ?: 0, MIN_SCALE_W)
+        val step = when {
+            observed <= 100 -> 50
+            observed <= 500 -> 100
+            observed <= 2000 -> 250
+            else -> 500
+        }
+        return ((observed + step - 1) / step) * step
+    }
+
+    /** 0..1 for the power arc. */
+    public fun pvFraction(configuredPeakWatts: Int): Float {
+        val power = solarCharger?.pvPowerW ?: return 0f
+        val scale = pvScaleMaxW(configuredPeakWatts)
+        return (power.toFloat() / scale).coerceIn(0f, 1f)
+    }
+
     public companion object {
+        private const val MIN_SCALE_W = 50
+
         public fun from(
             address: String,
             bleName: String?,

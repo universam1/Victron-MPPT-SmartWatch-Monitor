@@ -8,8 +8,8 @@ class VictronApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Also runs in the WorkManager process, which is what makes background scans able to
-        // refresh the tile.
-        VictronData.onScanFinished = { context -> VictronTileService.requestUpdate(context) }
+        // Also runs in the WorkManager and Data Layer processes, which is what lets a background
+        // scan — or a key that just arrived from the phone — refresh the tile.
+        VictronData.refreshSurfaces = { context -> VictronTileService.requestUpdate(context) }
     }
 }

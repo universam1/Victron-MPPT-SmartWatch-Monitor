@@ -10,15 +10,19 @@ device discovery and key entry; the same code also ships as a phone app.
 * No IDE required — everything builds in Docker with one script.
 
 ```
-┌─────────────────────┐
-│ Victron             │   tile
-│                     │
-│      142 W          │   ← PV power
-│   13.88 V  1.4 A    │   ← battery
-│   Absorption        │   ← charger state
-│   0.42 kWh · 8s     │   ← yield today · age of the reading
-└─────────────────────┘
+        ╭─────────────────────╮        arc = PV power against your array size
+      ╱   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁    ╲
+     │    SmartSolar 100/30  ›  │      tap the name to switch device
+     │                          │
+     │        142 W             │      ← solar yellow
+     │        Absorption        │
+     │    13.88 V    1.4 A      │      ← battery blue · charging green
+     │      0.42 kWh · 8s       │      ← yield green · age of the reading
+      ╲            ⚙           ╱
+        ╰─────────────────────╯
 ```
+
+The tile draws the same gauge, so tile and app never look like two different apps.
 
 ## Getting started
 
@@ -40,19 +44,23 @@ Android command line tools; Gradle comes from the wrapper). Later runs reuse a c
 so they take seconds. If you do have a local JDK 17+ and Android SDK, `VICTRON_NATIVE=1 ./build.sh
 apk` skips Docker entirely.
 
-### 3. Install on the watch
+### 3. Install both apps
 
 ```sh
-adb connect <watch-ip>:5555     # enable Wi-Fi debugging on the watch first
+./build.sh install-mobile        # phone: plug in via USB
+adb connect <watch-ip>:5555      # watch: enable Wi-Fi debugging first
 ./build.sh install-wear
 ```
 
-Then on the watch: open **Victron Monitor**, allow Bluetooth scanning, and your charger appears in
-the list — even before a key is entered, because model and address travel unencrypted. Tap it,
-type the key on the hex keypad, save. Add the tile via *press and hold the watch face → Tiles →
-+*.
+Easiest path: **enter the key once in the phone app** — paste it, done — and it syncs to the watch
+over the Wear OS Data Layer, together with the device label and array size. Grant Bluetooth
+scanning on both, then add the tile on the watch via *press and hold the watch face → Tiles → +*.
 
-The phone app (`./build.sh install-mobile`) works the same way and lets you paste the key.
+The watch also works entirely on its own: it lists every Victron device in range even without a key
+(model and address travel unencrypted), and has a hex keypad if you want to type the key there.
+
+> Both APKs must come from the same build — they share an `applicationId` and signing key, which is
+> what allows the Data Layer to connect them. `./build.sh apk` builds both, so this is automatic.
 
 ## What it shows
 
@@ -65,6 +73,7 @@ The phone app (`./build.sh install-mobile`) works the same way and lets you past
 | Yield today | Wh below 1 kWh, kWh above |
 | Load output | on models that have one |
 | Age | how old the reading is — always visible |
+| Gauge scale | your array size in W, or automatically the highest power seen so far |
 
 Other Victron devices (SmartShunt, Lynx Smart BMS, BatteryProtect, …) are **discovered and
 decrypted**, but their record types are not decoded into values yet; the *Raw data* screen shows

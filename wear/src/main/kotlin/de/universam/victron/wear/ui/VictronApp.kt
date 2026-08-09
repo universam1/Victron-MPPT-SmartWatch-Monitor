@@ -23,6 +23,7 @@ import de.universam.victron.data.VictronViewModel
 import kotlinx.coroutines.delay
 
 internal object Route {
+    const val HERO = "hero"
     const val OVERVIEW = "overview"
     const val DEVICES = "devices"
     const val DEBUG = "debug"
@@ -47,8 +48,15 @@ fun VictronApp(viewModel: VictronViewModel = viewModel()) {
 
             SwipeDismissableNavHost(
                 navController = navController,
-                startDestination = Route.OVERVIEW,
+                startDestination = Route.HERO,
             ) {
+                composable(Route.HERO) {
+                    HeroScreen(
+                        viewModel = viewModel,
+                        onOpenDetail = { address -> navController.navigate(Route.detail(address)) },
+                        onOpenDevices = { navController.navigate(Route.OVERVIEW) },
+                    )
+                }
                 composable(Route.OVERVIEW) {
                     OverviewScreen(
                         viewModel = viewModel,

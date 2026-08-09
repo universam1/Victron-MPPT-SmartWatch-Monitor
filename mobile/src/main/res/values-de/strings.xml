@@ -20,6 +20,13 @@
 
     <string name="background_scan">Hintergrund-Scan (~15 min)</string>
 
+    <string name="sync_title">Uhr</string>
+    <string name="sync_hint">Geräte und Schlüssel werden automatisch mit der gekoppelten Uhr synchronisiert. Beide Apps müssen aus demselben Build stammen.</string>
+    <string name="sync_now">Jetzt zur Uhr synchronisieren</string>
+
+    <string name="pv_peak_label">Modulleistung in W (optional)</string>
+    <string name="pv_peak_hint">Skalenende der Anzeige. Leer = höchste bisher gesehene Leistung.</string>
+
     <string name="status_missing_key">Noch kein Schlüssel</string>
     <string name="status_key_mismatch">Schlüssel passt nicht zu diesem Gerät</string>
     <string name="status_undecoded">Record-Typ noch nicht unterstützt</string>

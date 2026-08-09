@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -133,12 +135,31 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
                 snapshot = snapshot,
                 now = now,
                 existingKey = config.keyFor(snapshot.address),
+                pvPeakWatts = config.pvPeakWattsFor(snapshot.address),
                 onSaveKey = { key -> viewModel.saveKey(snapshot.address, key) },
+                onSavePeak = { watts -> viewModel.setPvPeakWatts(snapshot.address, watts) },
                 onRemove = { viewModel.removeDevice(snapshot.address) },
             )
         }
 
         item { HorizontalDivider() }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.sync_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(R.string.sync_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { viewModel.syncNow() }) {
+                    Text(stringResource(R.string.sync_now))
+                }
+            }
+        }
 
         item {
             Row(
@@ -167,11 +188,16 @@ private fun DeviceCard(
     snapshot: DeviceSnapshot,
     now: Long,
     existingKey: String?,
+    pvPeakWatts: Int,
     onSaveKey: (String) -> Boolean,
+    onSavePeak: (Int) -> Unit,
     onRemove: () -> Unit,
 ) {
     var keyInput by remember(snapshot.address, existingKey) { mutableStateOf(existingKey.orEmpty()) }
     var invalid by remember { mutableStateOf(false) }
+    var peakInput by remember(snapshot.address, pvPeakWatts) {
+        mutableStateOf(if (pvPeakWatts > 0) pvPeakWatts.toString() else "")
+    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -262,6 +288,22 @@ private fun DeviceCard(
                         Text(stringResource(R.string.key_remove))
                     }
                 }
+            }
+
+            if (existingKey != null) {
+                // Full scale of the gauge on the watch. Empty means "use the highest power seen".
+                OutlinedTextField(
+                    value = peakInput,
+                    onValueChange = { input ->
+                        peakInput = input.filter { it.isDigit() }.take(5)
+                        onSavePeak(peakInput.toIntOrNull() ?: 0)
+                    },
+                    label = { Text(stringResource(R.string.pv_peak_label)) },
+                    supportingText = { Text(stringResource(R.string.pv_peak_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

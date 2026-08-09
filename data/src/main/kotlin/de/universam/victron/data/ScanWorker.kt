@@ -48,7 +48,7 @@ public class ScanWorker(
         }.onFailure { Log.w(TAG, "Scan failed", it) }.getOrDefault(0)
 
         Log.d(TAG, "Scan window of ${seconds}s produced $received advertisements")
-        VictronData.onScanFinished?.invoke(applicationContext)
+        VictronData.refreshSurfaces?.invoke(applicationContext)
         return Result.success()
     }
 

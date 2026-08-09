@@ -69,6 +69,48 @@ The layout is built with the low-level `androidx.wear.protolayout` builders — 
 `setFreshnessIntervalMillis(60_000)` lets the renderer re-request the tile once a minute; the age
 string is rendered as text rather than as a dynamic expression, which keeps the layout simple.
 
+## Phone ↔ watch sync (companion mode)
+
+Typing a 32 character key on a watch is a punishment, so the phone app is a real companion: the
+device list — addresses, labels, keys, array size — travels over the **Wear OS Data Layer**.
+
+```
+phone app ──DataClient.putDataItem("/victron/devices")──▶ Data Layer ──▶ ConfigSyncListenerService
+   ▲                                                                              │
+   └──────────────── same service on the phone ◀── watch pushes its own list ──────┘
+```
+
+* Both sides may write; on receipt the lists are **merged per device, newer wins**
+  (`DeviceConfig.updatedAtEpochMillis`). If the merge result is newer than what the counterpart
+  published, the merged list is pushed straight back, so both ends converge.
+* Data items **persist** in the Data Layer: a watch that was switched off still picks up a key that
+  was entered on the phone hours earlier. Each app also pulls once on start (`syncNow()`).
+* **Removals are not synced.** A union merge cannot express "this is gone" without tombstones, and
+  the failure mode of guessing wrong (silently deleting a key on the other device) is worse than
+  deleting a device twice.
+* `backgroundScanEnabled` and the scan window stay **local** — what a phone can afford, a watch
+  cannot.
+
+Hard requirement: both APKs share `applicationId = de.universam.victron` and must be signed with
+the same key. The Data Layer namespaces data items per package + signature, so different ids mean
+the sync silently does nothing. Debug builds from the same machine (or the same CI run) satisfy
+this automatically.
+
+## Watch UI
+
+The main screen is a gauge, not a list: a 240° arc along the bezel for PV power, the watts in the
+middle, and the battery values as colour-coded chips underneath — the reading order VictronConnect
+trained everyone on. The tile draws the same gauge with two overlaid ProtoLayout `Arc`s so tile and
+app cannot drift apart.
+
+Colours come from one place, `data/VictronPalette.kt`, as ARGB ints, because the tile knows nothing
+about Compose: yellow = solar, blue = battery, green = current going in, orange = current going out,
+red = charger error, dim grey = "no value" or stale.
+
+The arc's full scale is the array size if you configured one (phone app), otherwise the highest
+power ever seen from that device, rounded up to a step a human would draw — with a 50 W floor, so
+3 W on a dark morning does not look like a full array.
+
 ## Permissions
 
 Only one runtime permission: `BLUETOOTH_SCAN`, declared with

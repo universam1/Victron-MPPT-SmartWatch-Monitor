@@ -112,6 +112,20 @@ fun DevicesScreen(
         }
 
         item {
+            Button(onClick = { viewModel.syncNow() }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.action_sync), maxLines = 2)
+            }
+        }
+
+        item {
+            Text(
+                text = stringResource(R.string.sync_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item {
             Button(onClick = onDebugClick, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_debug))
             }

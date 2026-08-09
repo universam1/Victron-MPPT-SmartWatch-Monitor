@@ -51,7 +51,7 @@ case "${1:-apk}" in
         run_gradle :wear:lintDebug :mobile:lintDebug
         ;;
     check)
-        run_gradle :protocol:test :wear:assembleDebug :mobile:assembleDebug
+        run_gradle :protocol:test :data:testDebugUnitTest :wear:assembleDebug :mobile:assembleDebug
         ;;
     install-wear)
         # adb runs on the host: the watch is paired with your machine, not with the container.

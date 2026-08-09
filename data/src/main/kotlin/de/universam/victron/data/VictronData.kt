@@ -14,12 +14,12 @@ public object VictronData {
     private var repository: VictronRepository? = null
 
     /**
-     * Called after a background scan finished, so an app can push its own surfaces (the watch app
-     * uses it to ask the platform for a tile update). Set it from `Application.onCreate`, which
-     * also runs in the WorkManager process.
+     * Called when new data landed — after a background scan, or after the counterpart device
+     * synced its configuration. The watch app uses it to ask the platform for a tile update. Set it
+     * from `Application.onCreate`, which also runs in the WorkManager and Data Layer processes.
      */
     @Volatile
-    public var onScanFinished: (suspend (Context) -> Unit)? = null
+    public var refreshSurfaces: (suspend (Context) -> Unit)? = null
 
     public fun repository(context: Context): VictronRepository {
         repository?.let { return it }
@@ -27,6 +27,7 @@ public object VictronData {
             repository ?: run {
                 val appContext = context.applicationContext
                 VictronRepository(
+                    context = appContext,
                     scanner = VictronScanner(appContext),
                     configStore = createConfigStore(appContext),
                     snapshotStore = createSnapshotStore(appContext),
