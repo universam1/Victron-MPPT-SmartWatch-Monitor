@@ -90,6 +90,11 @@ git tag v1.1.0
 git push origin v1.1.0
 ```
 
+Or, without touching git: run the **release** workflow from the *Actions* tab and enter the tag
+(e.g. `v1.1.0`) — the release is created together with the tag on the selected branch. Leaving the
+input empty makes it a dry run that builds everything and attaches the APKs as workflow artifacts
+without publishing.
+
 The [release workflow](.github/workflows/release.yml) runs the tests, derives `versionName` from the
 tag and `versionCode` from its numbers (`v1.2.3` → `10203`), builds `victron-monitor-wear-<version>.apk`
 and `victron-monitor-phone-<version>.apk`, adds `SHA256SUMS.txt`, and writes install instructions plus

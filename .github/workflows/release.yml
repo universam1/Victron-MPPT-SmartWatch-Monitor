@@ -4,13 +4,19 @@ name: release
 #
 #   git tag v1.1.0 && git push origin v1.1.0
 #
-# `workflow_dispatch` builds the same thing from any branch for a dry run; it only publishes when
-# it was started from a tag.
+# Or run this workflow from the Actions tab and pass the tag as an input — the release then creates
+# the tag on the chosen branch. Running it without an input is a dry run: it builds everything and
+# uploads the APKs as workflow artifacts, but publishes nothing.
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to release, e.g. v1.0.0. Empty = dry run, no release.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -38,12 +44,21 @@ jobs:
       # is fine for sideloading but means you cannot install the beta over the final.
       - name: Derive version
         id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version_name="${GITHUB_REF_NAME#v}"
+            tag="${GITHUB_REF_NAME}"
+            version_name="${tag#v}"
+            publish=true
+          elif [[ -n "${INPUT_TAG:-}" ]]; then
+            # Started from the Actions tab with a tag: gh creates the tag together with the release.
+            tag="${INPUT_TAG}"
+            version_name="${tag#v}"
             publish=true
           else
+            tag=""
             version_name="0.0.0-${GITHUB_SHA::7}"
             publish=false
           fi
@@ -55,8 +70,9 @@ jobs:
             echo "version_name=$version_name"
             echo "version_code=$version_code"
             echo "publish=$publish"
+            echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
-          echo "Building $version_name (versionCode $version_code), publish=$publish"
+          echo "Building $version_name (versionCode $version_code), publish=$publish, tag=${tag:-none}"
 
       # Without these secrets the APKs are signed with a throwaway debug key: fine for sideloading,
       # but such a build cannot be installed on top of a differently signed one.
@@ -114,7 +130,7 @@ jobs:
         if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.version.outputs.tag }}
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
           SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
@@ -143,16 +159,19 @@ jobs:
             --method POST \
             "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="$TAG" \
+            -f target_commitish="$GITHUB_SHA" \
             --jq '.body' >> notes.md
 
       - name: Publish release
         if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
+          # --target creates the tag when it does not exist yet and is ignored when it does.
           gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --title "$TAG" \
             --notes-file notes.md \
             dist/victron-monitor-*.apk dist/SHA256SUMS.txt
