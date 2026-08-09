@@ -4,6 +4,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Kept identical to wear/build.gradle.kts on purpose: both apps have to be signed with the same key
+// or the phone/watch configuration sync stops working.
+val releaseKeystore = rootProject.file("release.keystore")
+val releaseStorePassword: String? = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+val releaseKeyAlias: String? = System.getenv("SIGNING_KEY_ALIAS")
+val releaseKeyPassword: String? = System.getenv("SIGNING_KEY_PASSWORD")
+val hasReleaseSigning = releaseKeystore.exists() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank()
+
 android {
     namespace = "de.universam.victron.mobile"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -13,15 +23,30 @@ android {
         applicationId = "de.universam.victron"
         minSdk = libs.versions.minSdkMobile.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = (System.getenv("VICTRON_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("VICTRON_VERSION_NAME") ?: "1.0.0"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword ?: releaseStorePassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

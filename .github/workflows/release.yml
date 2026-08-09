@@ -1,0 +1,158 @@
+name: release
+
+# Tag a commit and the APKs show up on the Releases page:
+#
+#   git tag v1.1.0 && git push origin v1.1.0
+#
+# `workflow_dispatch` builds the same thing from any branch for a dry run; it only publishes when
+# it was started from a tag.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build and publish APKs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+
+      # versionName comes from the tag, versionCode from the same numbers so it rises with every
+      # release: v1.2.3 -> 10203. Manual runs get 0.0.0-<sha> and are never published.
+      # A prerelease tag keeps the versionCode of its final version (v1.1.0-beta1 == v1.1.0), which
+      # is fine for sideloading but means you cannot install the beta over the final.
+      - name: Derive version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version_name="${GITHUB_REF_NAME#v}"
+            publish=true
+          else
+            version_name="0.0.0-${GITHUB_SHA::7}"
+            publish=false
+          fi
+          core="${version_name%%-*}"
+          IFS='.' read -r major minor patch <<< "$core"
+          version_code=$(( ${major:-0} * 10000 + ${minor:-0} * 100 + ${patch:-0} ))
+          [[ "$version_code" -gt 0 ]] || version_code=1
+          {
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building $version_name (versionCode $version_code), publish=$publish"
+
+      # Without these secrets the APKs are signed with a throwaway debug key: fine for sideloading,
+      # but such a build cannot be installed on top of a differently signed one.
+      - name: Decode signing keystore
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${KEYSTORE_BASE64:-}" ]]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > release.keystore
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Using the release keystore from repository secrets."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No SIGNING_KEYSTORE_BASE64 secret — APKs will be debug-signed."
+          fi
+
+      - name: Test and build release APKs
+        env:
+          VICTRON_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VICTRON_VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon \
+            :protocol:test \
+            :data:testDebugUnitTest \
+            :wear:assembleRelease \
+            :mobile:assembleRelease
+
+      - name: Collect APKs
+        id: collect
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp wear/build/outputs/apk/release/wear-release.apk \
+             "dist/victron-monitor-wear-${VERSION_NAME}.apk"
+          cp mobile/build/outputs/apk/release/mobile-release.apk \
+             "dist/victron-monitor-phone-${VERSION_NAME}.apk"
+          ( cd dist && sha256sum *.apk > SHA256SUMS.txt )
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-apks-${{ steps.version.outputs.version_name }}
+          path: dist/*
+
+      # Release notes: GitHub's generated changelog plus the two things people actually need to
+      # know when sideloading these APKs.
+      - name: Compose release notes
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Install"
+            echo
+            echo '```sh'
+            echo "adb install -r victron-monitor-phone-${VERSION_NAME}.apk   # phone"
+            echo "adb connect <watch-ip>:5555"
+            echo "adb install -r victron-monitor-wear-${VERSION_NAME}.apk    # watch"
+            echo '```'
+            echo
+            echo "Install **both** APKs from this release: they share an application id and signing"
+            echo "key, which is what lets the phone app sync the advertisement keys to the watch."
+            if [[ "$SIGNED" != "true" ]]; then
+              echo
+              echo "> ⚠️ This build is signed with a throwaway debug key (no signing secrets are"
+              echo "> configured in the repository), so it cannot be installed over a build signed"
+              echo "> with a different key — uninstall the previous version first."
+            fi
+            echo
+          } > notes.md
+
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$TAG" \
+            --jq '.body' >> notes.md
+
+      - name: Publish release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            dist/victron-monitor-*.apk dist/SHA256SUMS.txt

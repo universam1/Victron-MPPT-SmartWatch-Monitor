@@ -80,6 +80,49 @@ decrypted**, but their record types are not decoded into values yet; the *Raw da
 their decrypted payload. Adding one is a self-contained change — the layouts are documented in
 [docs/victron-ble-protocol.md](docs/victron-ble-protocol.md).
 
+## Releases
+
+Tag a commit and CI publishes both APKs to the
+[Releases page](https://github.com/universam1/Victron-MPPT-SmartWatch-Monitor-/releases):
+
+```sh
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The [release workflow](.github/workflows/release.yml) runs the tests, derives `versionName` from the
+tag and `versionCode` from its numbers (`v1.2.3` → `10203`), builds `victron-monitor-wear-<version>.apk`
+and `victron-monitor-phone-<version>.apk`, adds `SHA256SUMS.txt`, and writes install instructions plus
+GitHub's generated changelog into the release notes. Always install **both** APKs from the same
+release — they share an application id and signing key, which is what makes the key sync work.
+
+No tag needed for a test build: every push runs [build.yml](.github/workflows/build.yml), which
+attaches debug APKs as workflow artifacts.
+
+### Signing (optional, but do it before the first real release)
+
+Without a keystore the APKs are signed with a throwaway debug key: installable, but a later
+differently signed build cannot replace it. To sign properly, create a keystore once
+
+```sh
+keytool -genkeypair -v -keystore release.keystore -alias victron \
+        -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 release.keystore                 # paste this into the secret below
+```
+
+and add four repository secrets (*Settings → Secrets and variables → Actions*):
+
+| Secret | Value |
+|---|---|
+| `SIGNING_KEYSTORE_BASE64` | output of the `base64 -w0` command |
+| `SIGNING_KEYSTORE_PASSWORD` | keystore password |
+| `SIGNING_KEY_ALIAS` | `victron` (the alias above) |
+| `SIGNING_KEY_PASSWORD` | key password, if different from the keystore password |
+
+Keep the keystore file — losing it means every future release needs an uninstall/reinstall. The same
+variables work locally: put `release.keystore` in the repository root, export the three `SIGNING_*`
+variables and run `./build.sh apk-release`.
+
 ## Battery use
 
 Nothing scans permanently. The app scans only while a screen is open; the tile triggers a ~12 s

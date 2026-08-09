@@ -5,6 +5,7 @@
 #   ./build.sh apk            debug APKs for watch and phone
 #   ./build.sh apk-wear       watch APK only
 #   ./build.sh apk-mobile     phone APK only
+#   ./build.sh apk-release    release APKs (see .github/workflows/release.yml for signing)
 #   ./build.sh lint           Android lint on both apps
 #   ./build.sh install-wear   install the watch APK on a connected/paired watch (adb)
 #   ./build.sh install-mobile install the phone APK
@@ -45,6 +46,12 @@ case "${1:-apk}" in
         ;;
     apk-mobile)
         run_gradle :mobile:assembleDebug
+        echo "APKs:"; apk_paths
+        ;;
+    apk-release)
+        # Signed with the release keystore when release.keystore + SIGNING_* env vars are present,
+        # with the debug key otherwise. CI does the same, see .github/workflows/release.yml.
+        run_gradle :wear:assembleRelease :mobile:assembleRelease
         echo "APKs:"; apk_paths
         ;;
     lint)

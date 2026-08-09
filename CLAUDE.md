@@ -14,7 +14,14 @@ VICTRON_NATIVE=1 ./build.sh apk   # use a local JDK 17+/Android SDK instead of D
 
 Versions live in [gradle/libs.versions.toml](gradle/libs.versions.toml). CI
 ([.github/workflows/build.yml](.github/workflows/build.yml)) runs the protocol tests without an
-Android SDK and then builds both APKs.
+Android SDK, then the `:data` unit tests and both APKs.
+
+Releases are tag-driven: `git push origin v1.2.3` makes
+[.github/workflows/release.yml](.github/workflows/release.yml) test, build and publish both release
+APKs. `versionName` comes from the tag and `versionCode` from its numbers (`v1.2.3` → `10203`) via the
+`VICTRON_VERSION_NAME`/`VICTRON_VERSION_CODE` env vars the app modules read — don't hardcode versions
+in the build files. Signing uses `release.keystore` plus `SIGNING_*` env vars when present and falls
+back to the debug key, so `assembleRelease` always works locally.
 
 ## Architecture
 
@@ -58,7 +65,9 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   ints, because the tile knows nothing about Compose). App and tile must never diverge.
 - **Both apps keep `applicationId = de.universam.victron`** and the same signing key. The Wear OS
   Data Layer namespaces data items per package + signature — change one id and the key sync stops
-  working silently. Module `namespace`s stay distinct (`.wear` / `.mobile`).
+  working silently. Module `namespace`s stay distinct (`.wear` / `.mobile`). For the same reason the
+  signing block in `wear/build.gradle.kts` and `mobile/build.gradle.kts` is duplicated verbatim:
+  if you change one, change the other.
 - **Config sync is a per-device last-write-wins union** (`AppConfig.mergeDevices`). Do not "fix" it
   into a wholesale replace: that lets one device wipe the other's keys. Removals are intentionally
   not propagated; `backgroundScanEnabled`/scan window stay local per device.
