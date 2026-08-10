@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceConfig
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotCache
 import de.universam.victron.data.sync.ConfigSync
 import de.universam.victron.protocol.DecodeResult
@@ -38,8 +39,14 @@ public class VictronRepository internal constructor(
 
     private val _snapshots = MutableStateFlow<Map<String, DeviceSnapshot>>(emptyMap())
 
+    /** Ring buffer of recent readings per device, for sparkline graphs. */
+    private val _history = MutableStateFlow<Map<String, ReadingHistory>>(emptyMap())
+
     /** Newest snapshot per BLE address, keyed by uppercase address. */
     public val snapshots: StateFlow<Map<String, DeviceSnapshot>> = _snapshots.asStateFlow()
+
+    /** Recent value history per device address (in-memory only, not persisted). */
+    public val history: StateFlow<Map<String, ReadingHistory>> = _history.asStateFlow()
 
     public val config: Flow<AppConfig> = configStore.data
 
@@ -96,6 +103,7 @@ public class VictronRepository internal constructor(
             val snapshot = decode(raw, currentConfig, keys) ?: return@collect
             val address = snapshot.address.uppercase()
             _snapshots.value = _snapshots.value + (address to snapshot.carryOver(_snapshots.value[address]))
+            appendHistory(address, snapshot)
             onSnapshot(snapshot)
         }
     }
@@ -104,6 +112,14 @@ public class VictronRepository internal constructor(
     public suspend fun persistSnapshots() {
         val current = _snapshots.value.values.toList()
         snapshotStore.updateData { SnapshotCache(current) }
+    }
+
+    private fun appendHistory(address: String, snapshot: DeviceSnapshot) {
+        val values = snapshot.solarCharger ?: return
+        val current = _history.value
+        val h = current[address] ?: ReadingHistory()
+        h.append(values)
+        _history.value = current + (address to h)
     }
 
     private fun decode(

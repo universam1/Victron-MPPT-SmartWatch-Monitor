@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceConfig
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
 import de.universam.victron.protocol.VictronCipher
 import kotlinx.coroutines.Job
@@ -52,6 +53,9 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
 
     public val config: StateFlow<AppConfig> = repository.config
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConfig())
+
+    /** Recent value history per device address, for sparkline graphs. */
+    public val history: StateFlow<Map<String, ReadingHistory>> = repository.history
 
     private var scanJob: Job? = null
 

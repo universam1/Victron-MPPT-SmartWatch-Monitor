@@ -5,7 +5,7 @@
 #
 # The image contains only the JDK and the command line SDK; Gradle itself comes from the
 # wrapper, so the build is pinned by the repository, not by the image.
-FROM eclipse-temurin:21-jdk-noble
+FROM docker.io/library/eclipse-temurin:21-jdk-noble
 
 ARG ANDROID_CMDLINE_TOOLS_VERSION=13114758
 ARG ANDROID_PLATFORM=android-36

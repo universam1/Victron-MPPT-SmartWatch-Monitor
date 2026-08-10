@@ -40,4 +40,9 @@
     <string name="label_age">Age</string>
     <string name="label_signal">Signal</string>
     <string name="label_payload">Decrypted payload</string>
+
+    <string name="dashboard_setup">Setup</string>
+    <string name="dashboard_view">Dashboard</string>
+    <string name="label_battery_current">Battery Current</string>
+    <string name="label_voltage">Voltage</string>
 </resources>

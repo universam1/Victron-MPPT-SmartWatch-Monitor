@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.android.screenshot)
 }
 
 // Release signing, if a keystore was provided (CI secrets or a local release.keystore). Both apps
@@ -59,6 +60,9 @@ android {
         compose = true
     }
 
+    @Suppress("UnstableApiUsage")
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -88,4 +92,7 @@ dependencies {
     implementation(libs.androidx.protolayout)
     implementation(libs.androidx.protolayout.expression)
     implementation(libs.androidx.concurrent.futures.ktx)
+
+    screenshotTestImplementation(libs.androidx.compose.ui.tooling)
+    screenshotTestImplementation(libs.screenshot.validation.api)
 }

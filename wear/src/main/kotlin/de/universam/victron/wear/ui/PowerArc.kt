@@ -20,7 +20,8 @@ private const val SWEEP_ANGLE = 240f
 
 /**
  * The gauge the whole watch screen is built around: one thick arc for PV power, drawn along the
- * bezel so the middle stays free for the number itself.
+ * bezel so the middle stays free for the number itself. A glow layer behind the fill arc adds depth
+ * on OLED displays.
  */
 @Composable
 fun PowerArc(
@@ -28,7 +29,7 @@ fun PowerArc(
     color: Color,
     trackColor: Color,
     modifier: Modifier = Modifier,
-    strokeWidth: Dp = 9.dp,
+    strokeWidth: Dp = 11.dp,
 ) {
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
@@ -38,25 +39,38 @@ fun PowerArc(
 
     Canvas(modifier = modifier) {
         val stroke = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
-        val inset = strokeWidth.toPx() / 2f
-        val arcSize = Size(size.width - strokeWidth.toPx(), size.height - strokeWidth.toPx())
+        val glowStroke = Stroke(width = strokeWidth.toPx() + 6.dp.toPx(), cap = StrokeCap.Round)
+        val inset = (strokeWidth.toPx() + 6.dp.toPx()) / 2f
+        val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
+        val topLeft = Offset(inset, inset)
 
         drawArc(
             color = trackColor,
             startAngle = START_ANGLE,
             sweepAngle = SWEEP_ANGLE,
             useCenter = false,
-            topLeft = Offset(inset, inset),
+            topLeft = topLeft,
             size = arcSize,
             style = stroke,
         )
         if (animated > 0f) {
+            // Glow layer
+            drawArc(
+                color = color.copy(alpha = 0.25f),
+                startAngle = START_ANGLE,
+                sweepAngle = SWEEP_ANGLE * animated,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = glowStroke,
+            )
+            // Main arc
             drawArc(
                 color = color,
                 startAngle = START_ANGLE,
                 sweepAngle = SWEEP_ANGLE * animated,
                 useCenter = false,
-                topLeft = Offset(inset, inset),
+                topLeft = topLeft,
                 size = arcSize,
                 style = stroke,
             )

@@ -2,6 +2,10 @@ package de.universam.victron.mobile.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,22 +43,32 @@ import de.universam.victron.data.Formatting
 import de.universam.victron.data.ScanState
 import de.universam.victron.data.ScanUnavailable
 import de.universam.victron.data.VictronViewModel
+import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
 import de.universam.victron.mobile.R
+import de.universam.victron.mobile.ui.dashboard.DashboardScreen
 import kotlinx.coroutines.delay
 
 private const val BLUETOOTH_SCAN = android.Manifest.permission.BLUETOOTH_SCAN
 
+private sealed interface Screen {
+    data object Dashboard : Screen
+    data object Setup : Screen
+}
+
 /**
  * Phone side of the same app: identical data, identical scanning, but with room for a text field
- * so pasting a 32 character key is not a chore.
+ * so pasting a 32 character key is not a chore. Auto-navigates to a fullscreen dashboard when
+ * decoded data is available.
  */
 @Composable
 fun MobileApp(viewModel: VictronViewModel = viewModel()) {
     val snapshots by viewModel.snapshots.collectAsStateWithLifecycle()
     val config by viewModel.config.collectAsStateWithLifecycle()
     val scanState by viewModel.scanState.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
 
     DisposableEffect(Unit) {
         viewModel.startLiveScan()
@@ -69,6 +83,55 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
         }
     }
 
+    // Auto-navigate to dashboard when decoded devices exist (fires once).
+    var screen by remember { mutableStateOf<Screen>(Screen.Setup) }
+    var hasAutoNavigated by remember { mutableStateOf(false) }
+    val hasDecoded = snapshots.any { it.status == SnapshotStatus.DECODED }
+
+    LaunchedEffect(hasDecoded) {
+        if (hasDecoded && !hasAutoNavigated) {
+            screen = Screen.Dashboard
+            hasAutoNavigated = true
+        }
+    }
+
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "screen",
+    ) { target ->
+        when (target) {
+            Screen.Dashboard -> DashboardScreen(
+                snapshots = snapshots,
+                config = config,
+                now = now,
+                history = history,
+                onOpenSetup = { screen = Screen.Setup },
+            )
+
+            Screen.Setup -> SetupContent(
+                viewModel = viewModel,
+                snapshots = snapshots,
+                config = config,
+                scanState = scanState,
+                now = now,
+                onOpenDashboard = if (hasDecoded) {
+                    { screen = Screen.Dashboard }
+                } else null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SetupContent(
+    viewModel: VictronViewModel,
+    snapshots: List<DeviceSnapshot>,
+    config: AppConfig,
+    scanState: ScanState,
+    now: Long,
+    onOpenDashboard: (() -> Unit)?,
+) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) viewModel.retryScan() }
@@ -88,12 +151,22 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
                     text = stringResource(R.string.devices),
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                if (scanState == ScanState.Scanning) {
-                    Text(
-                        text = stringResource(R.string.scanning),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (scanState == ScanState.Scanning) {
+                        Text(
+                            text = stringResource(R.string.scanning),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (onOpenDashboard != null) {
+                        OutlinedButton(onClick = onOpenDashboard) {
+                            Text(stringResource(R.string.dashboard_view))
+                        }
+                    }
                 }
             }
         }
