@@ -39,7 +39,8 @@ RUN yes | sdkmanager --licenses > /dev/null && \
     sdkmanager --install \
         "platform-tools" \
         "platforms;${ANDROID_PLATFORM}" \
-        "build-tools;${ANDROID_BUILD_TOOLS}" > /dev/null
+        "build-tools;${ANDROID_BUILD_TOOLS}" \
+        "build-tools;35.0.0" > /dev/null
 
 # No USER directive — docker-compose.yml uses `userns_mode: keep-id` (podman) to run
 # as the host user, giving write access to the bind-mounted workspace.
