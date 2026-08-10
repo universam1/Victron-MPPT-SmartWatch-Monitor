@@ -13,7 +13,7 @@ ARG ANDROID_BUILD_TOOLS=36.0.0
 
 ENV ANDROID_HOME=/opt/android-sdk \
     ANDROID_SDK_ROOT=/opt/android-sdk \
-    GRADLE_USER_HOME=/home/builder/.gradle \
+    GRADLE_USER_HOME=/gradle-home \
     DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -21,11 +21,9 @@ RUN apt-get update && \
         unzip curl git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --shell /bin/bash builder && \
-    mkdir -p "$ANDROID_HOME" && chown -R builder:builder "$ANDROID_HOME"
-
-USER builder
-WORKDIR /home/builder
+# Android SDK — installed as root, world-readable so any runtime UID can use it.
+RUN mkdir -p "$ANDROID_HOME" "$GRADLE_USER_HOME" && \
+    chmod 777 "$GRADLE_USER_HOME"
 
 # Command line tools -> $ANDROID_HOME/cmdline-tools/latest (the layout sdkmanager expects).
 RUN curl -fsSL -o /tmp/cmdline-tools.zip \
@@ -43,4 +41,6 @@ RUN yes | sdkmanager --licenses > /dev/null && \
         "platforms;${ANDROID_PLATFORM}" \
         "build-tools;${ANDROID_BUILD_TOOLS}" > /dev/null
 
+# No USER directive — docker-compose.yml uses `userns_mode: keep-id` (podman) to run
+# as the host user, giving write access to the bind-mounted workspace.
 WORKDIR /workspace

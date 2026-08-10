@@ -4,15 +4,20 @@ services:
       context: .
       dockerfile: Dockerfile
     image: victron-monitor-build:latest
+    # Map the host UID/GID straight through so the container can write to the
+    # bind-mounted workspace (project cache, build outputs). Without this, podman's
+    # rootless user namespace remaps host files to root inside the container.
+    userns_mode: keep-id
     working_dir: /workspace
     volumes:
       # The repository itself.
       - ..:/workspace
       # Keep the Gradle cache between runs so a rebuild takes seconds, not minutes.
-      - gradle-cache:/home/builder/.gradle
+      - gradle-cache:/gradle-home
     environment:
       # Gradle inside a container: no daemon, and no interactive console.
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.console=plain
+      GRADLE_USER_HOME: /gradle-home
     # `docker compose run build <command>` overrides this.
     command: ./gradlew tasks
 
