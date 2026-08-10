@@ -5,13 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -93,12 +93,15 @@ fun VictronApp(viewModel: VictronViewModel = viewModel()) {
     }
 }
 
-/** Scans while the composable is on screen, and stops as soon as it leaves. */
+/**
+ * Scans for the whole lifetime of the composable's coroutine scope — survives the Activity
+ * being stopped (ambient mode / display off) because it is tied to the ViewModel, not to
+ * composition or lifecycle state.
+ */
 @Composable
 internal fun ScanWhileVisible(viewModel: VictronViewModel) {
-    DisposableEffect(Unit) {
+    LaunchedEffect(Unit) {
         viewModel.startLiveScan()
-        onDispose { viewModel.stopLiveScan() }
     }
 }
 
@@ -115,7 +118,10 @@ internal fun rememberNow(): Long {
     return now
 }
 
-/** Convenience so screens can read state flows without repeating the import. */
+/**
+ * Convenience so screens can read state flows without repeating the import.
+ * Uses [Lifecycle.State.CREATED] so values keep flowing in ambient mode (display off).
+ */
 @Composable
 internal fun <T> collect(flow: kotlinx.coroutines.flow.StateFlow<T>): T =
-    flow.collectAsStateWithLifecycle().value
+    flow.collectAsStateWithLifecycle(minActiveState = Lifecycle.State.CREATED).value

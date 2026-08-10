@@ -27,6 +27,9 @@
     <string name="pv_peak_label">Array size in W (optional)</string>
     <string name="pv_peak_hint">Full scale of the gauge. Empty = highest power seen so far.</string>
 
+    <string name="battery_current_max_label">Max battery current in A</string>
+    <string name="battery_current_max_hint">Full scale of the current arc. Default: 15 A.</string>
+
     <string name="status_missing_key">No key yet</string>
     <string name="status_key_mismatch">Key does not match this device</string>
     <string name="status_undecoded">Record type not supported yet</string>

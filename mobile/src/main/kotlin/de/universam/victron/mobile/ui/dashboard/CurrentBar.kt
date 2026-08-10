@@ -116,6 +116,15 @@ fun CurrentBar(
                         size = Size(fillWidth, size.height),
                         cornerRadius = corner,
                     )
+                } else {
+                    // Minimal pill at the start so the bar is identifiable even at 0.
+                    val minWidth = size.height // a circle (width == height of the bar)
+                    drawRoundRect(
+                        color = barColor,
+                        topLeft = Offset.Zero,
+                        size = Size(minWidth, size.height),
+                        cornerRadius = corner,
+                    )
                 }
             }
         }

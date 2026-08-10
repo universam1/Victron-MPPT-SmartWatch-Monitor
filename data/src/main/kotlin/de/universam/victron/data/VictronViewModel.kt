@@ -80,6 +80,14 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         }
     }
 
+    /** Full scale of the battery current arc in amps. */
+    public fun setBatteryCurrentMax(address: String, amps: Double) {
+        val existing = config.value.deviceFor(address) ?: return
+        viewModelScope.launch {
+            repository.upsertDevice(existing.copy(batteryCurrentMax = amps.coerceAtLeast(1.0)))
+        }
+    }
+
     /** Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly. */
     public fun startLiveScan(aggressiveness: ScanAggressiveness = ScanAggressiveness.LowLatency) {
         if (scanJob?.isActive == true) return

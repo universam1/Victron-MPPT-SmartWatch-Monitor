@@ -118,8 +118,7 @@ public class VictronRepository internal constructor(
         val values = snapshot.solarCharger ?: return
         val current = _history.value
         val h = current[address] ?: ReadingHistory()
-        h.append(values)
-        _history.value = current + (address to h)
+        _history.value = current + (address to h.append(values))
     }
 
     private fun decode(

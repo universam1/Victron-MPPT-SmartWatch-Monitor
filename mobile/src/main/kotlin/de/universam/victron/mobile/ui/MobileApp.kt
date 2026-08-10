@@ -209,8 +209,10 @@ private fun SetupContent(
                 now = now,
                 existingKey = config.keyFor(snapshot.address),
                 pvPeakWatts = config.pvPeakWattsFor(snapshot.address),
+                batteryCurrentMax = config.batteryCurrentMaxFor(snapshot.address),
                 onSaveKey = { key -> viewModel.saveKey(snapshot.address, key) },
                 onSavePeak = { watts -> viewModel.setPvPeakWatts(snapshot.address, watts) },
+                onSaveBatteryMax = { amps -> viewModel.setBatteryCurrentMax(snapshot.address, amps) },
                 onRemove = { viewModel.removeDevice(snapshot.address) },
             )
         }
@@ -262,14 +264,19 @@ private fun DeviceCard(
     now: Long,
     existingKey: String?,
     pvPeakWatts: Int,
+    batteryCurrentMax: Double,
     onSaveKey: (String) -> Boolean,
     onSavePeak: (Int) -> Unit,
+    onSaveBatteryMax: (Double) -> Unit,
     onRemove: () -> Unit,
 ) {
     var keyInput by remember(snapshot.address, existingKey) { mutableStateOf(existingKey.orEmpty()) }
     var invalid by remember { mutableStateOf(false) }
     var peakInput by remember(snapshot.address, pvPeakWatts) {
         mutableStateOf(if (pvPeakWatts > 0) pvPeakWatts.toString() else "")
+    }
+    var batteryMaxInput by remember(snapshot.address, batteryCurrentMax) {
+        mutableStateOf(batteryCurrentMax.toInt().toString())
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -373,6 +380,19 @@ private fun DeviceCard(
                     },
                     label = { Text(stringResource(R.string.pv_peak_label)) },
                     supportingText = { Text(stringResource(R.string.pv_peak_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // Full scale of the battery current arc. Empty means default 15 A.
+                OutlinedTextField(
+                    value = batteryMaxInput,
+                    onValueChange = { input ->
+                        batteryMaxInput = input.filter { it.isDigit() }.take(3)
+                        onSaveBatteryMax((batteryMaxInput.toIntOrNull() ?: 15).toDouble())
+                    },
+                    label = { Text(stringResource(R.string.battery_current_max_label)) },
+                    supportingText = { Text(stringResource(R.string.battery_current_max_hint)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),

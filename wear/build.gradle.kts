@@ -87,12 +87,6 @@ dependencies {
     implementation(libs.androidx.wear.compose.material3)
     implementation(libs.androidx.wear.compose.navigation)
 
-    // Tile
-    implementation(libs.androidx.tiles)
-    implementation(libs.androidx.protolayout)
-    implementation(libs.androidx.protolayout.expression)
-    implementation(libs.androidx.concurrent.futures.ktx)
-
     screenshotTestImplementation(libs.androidx.compose.ui.tooling)
     screenshotTestImplementation(libs.screenshot.validation.api)
 }

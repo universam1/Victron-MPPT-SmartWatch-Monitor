@@ -99,6 +99,19 @@ fun PvArcGauge(
                     size = arcSize,
                     style = stroke,
                 )
+            } else {
+                // Minimal dot at the start so the arc is identifiable even at 0.
+                val fillColor = if (stale) TEXT_DIM else SOLAR
+                val minSweep = strokeWidth / (arcSize.width / 2f) * (180f / Math.PI.toFloat())
+                drawArc(
+                    color = fillColor,
+                    startAngle = START_ANGLE,
+                    sweepAngle = minSweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = stroke,
+                )
             }
         }
 

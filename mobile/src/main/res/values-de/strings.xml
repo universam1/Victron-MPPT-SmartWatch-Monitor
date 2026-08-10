@@ -27,6 +27,9 @@
     <string name="pv_peak_label">Modulleistung in W (optional)</string>
     <string name="pv_peak_hint">Skalenende der Anzeige. Leer = höchste bisher gesehene Leistung.</string>
 
+    <string name="battery_current_max_label">Max. Batteriestrom in A</string>
+    <string name="battery_current_max_hint">Skalenende des Strom-Bogens. Standard: 15 A.</string>
+
     <string name="status_missing_key">Noch kein Schlüssel</string>
     <string name="status_key_mismatch">Schlüssel passt nicht zu diesem Gerät</string>
     <string name="status_undecoded">Record-Typ noch nicht unterstützt</string>

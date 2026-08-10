@@ -106,6 +106,12 @@ public data class DeviceSnapshot(
         return (power.toFloat() / scale).coerceIn(0f, 1f)
     }
 
+    /** 0..1 for the battery current arc. */
+    public fun batteryCurrentFraction(maxAmps: Double): Float {
+        val current = solarCharger?.batteryCurrent ?: return 0f
+        return (kotlin.math.abs(current) / maxAmps).coerceIn(0.0, 1.0).toFloat()
+    }
+
     public companion object {
         private const val MIN_SCALE_W = 50
 

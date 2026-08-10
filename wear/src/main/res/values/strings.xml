@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Victron Monitor</string>
-    <string name="tile_label">Victron</string>
-    <string name="tile_description">Solar charger at a glance</string>
 
     <string name="overview_title">Victron</string>
     <string name="settings_title">Settings</string>
@@ -48,7 +46,7 @@
 
     <string name="background_scan_on">Background scan: on</string>
     <string name="background_scan_off">Background scan: off</string>
-    <string name="background_scan_hint">Refreshes the tile about every 15 minutes.</string>
+    <string name="background_scan_hint">Scans about every 15 minutes while the app is closed.</string>
 
     <string name="action_sync">Sync with phone</string>
     <string name="sync_hint">Keys entered in the phone app arrive here automatically.</string>

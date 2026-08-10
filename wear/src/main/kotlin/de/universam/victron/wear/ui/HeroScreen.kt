@@ -85,6 +85,7 @@ fun HeroScreen(
             else -> Gauge(
                 snapshot = selected,
                 peakWatts = config.pvPeakWattsFor(selected.address),
+                batteryCurrentMax = config.batteryCurrentMaxFor(selected.address),
                 now = now,
                 deviceCount = decoded.size,
                 onCycleDevice = { index = (index + 1) % decoded.size },
@@ -99,6 +100,7 @@ fun HeroScreen(
 private fun Gauge(
     snapshot: DeviceSnapshot,
     peakWatts: Int,
+    batteryCurrentMax: Double,
     now: Long,
     deviceCount: Int,
     onCycleDevice: () -> Unit,
@@ -108,14 +110,29 @@ private fun Gauge(
     val values = snapshot.solarCharger
     val stale = Formatting.isStale(snapshot, now)
     val solar = if (stale) Color(VictronPalette.TEXT_DIM) else Color(VictronPalette.SOLAR)
+    val currentColor = if (stale) {
+        Color(VictronPalette.TEXT_DIM)
+    } else {
+        Color(VictronPalette.currentColor(values?.batteryCurrent))
+    }
 
+    // Outer arc: PV power — flush to the edge for maximum use of the bezel.
     PowerArc(
         fraction = snapshot.pvFraction(peakWatts),
         color = solar,
         trackColor = Color(VictronPalette.TRACK),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(3.dp),
+        modifier = Modifier.fillMaxSize(),
+    )
+
+    // Bottom arc: battery current — fills the gap left by the PV arc, with spacing.
+    PowerArc(
+        fraction = snapshot.batteryCurrentFraction(batteryCurrentMax),
+        color = currentColor,
+        trackColor = Color(VictronPalette.TRACK),
+        modifier = Modifier.fillMaxSize(),
+        strokeWidth = 11.dp,
+        startAngle = 38f,   // 30° + 8° gap from PV arc end
+        sweepAngle = 104f,  // 120° - 2×8° gap
     )
 
     Column(

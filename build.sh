@@ -23,7 +23,13 @@ run_gradle() {
     if [[ "${VICTRON_NATIVE:-0}" == "1" ]]; then
         ./gradlew "$@"
     else
-        docker compose -f "$COMPOSE_FILE" run --rm build ./gradlew "$@"
+        # Pass signing env vars through to the container when set.
+        local env_args=()
+        for var in SIGNING_KEYSTORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD \
+                   VICTRON_VERSION_NAME VICTRON_VERSION_CODE; do
+            [[ -n "${!var:-}" ]] && env_args+=(-e "$var=${!var}")
+        done
+        docker compose -f "$COMPOSE_FILE" run --rm "${env_args[@]}" build ./gradlew "$@"
     fi
 }
 
@@ -51,7 +57,9 @@ case "${1:-apk}" in
     apk-release)
         # Signed with the release keystore when release.keystore + SIGNING_* env vars are present,
         # with the debug key otherwise. CI does the same, see .github/workflows/release.yml.
-        run_gradle :wear:assembleRelease :mobile:assembleRelease
+        # --no-build-cache: the signing config is not part of the task cache key, so a prior
+        # debug-signed cache entry would be served otherwise.
+        run_gradle --no-build-cache :wear:assembleRelease :mobile:assembleRelease
         echo "APKs:"; apk_paths
         ;;
     lint)

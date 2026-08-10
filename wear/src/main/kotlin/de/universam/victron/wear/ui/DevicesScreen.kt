@@ -82,36 +82,6 @@ fun DevicesScreen(
         item { ListHeader { Text(stringResource(R.string.settings_title)) } }
 
         item {
-            Button(
-                onClick = { viewModel.setBackgroundScanEnabled(!config.backgroundScanEnabled) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = if (config.backgroundScanEnabled) {
-                        stringResource(R.string.background_scan_on)
-                    } else {
-                        stringResource(R.string.background_scan_off)
-                    },
-                    maxLines = 2,
-                )
-            }
-        }
-
-        item {
-            Text(
-                text = stringResource(R.string.background_scan_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        item {
-            Button(onClick = { viewModel.requestScanNow() }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.action_rescan))
-            }
-        }
-
-        item {
             Button(onClick = { viewModel.syncNow() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_sync), maxLines = 2)
             }
