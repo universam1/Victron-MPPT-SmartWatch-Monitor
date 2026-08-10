@@ -33,7 +33,6 @@ private val SOLAR = Color(VictronPalette.SOLAR)
 private val SOLAR_GLOW = Color(0xFF_FFD54F).copy(alpha = 0.35f)
 private val TRACK = Color(0xFF1A2332)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
-private val TEXT_PRIMARY = Color(VictronPalette.TEXT)
 
 /**
  * Large animated arc gauge showing PV power. A glow arc drawn behind the main arc gives depth;
@@ -45,7 +44,6 @@ fun PvArcGauge(
     watts: Int?,
     scaleMaxW: Int,
     stale: Boolean,
-    stateLabel: String? = null,
     sparklineValues: List<Float> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -120,15 +118,6 @@ fun PvArcGauge(
                 fontSize = 14.sp,
                 color = if (stale) TEXT_DIM else SOLAR,
             )
-            if (stateLabel != null) {
-                Text(
-                    text = stateLabel,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (stale) TEXT_DIM else TEXT_PRIMARY,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
             // Power sparkline inside the arc
             if (sparklineValues.size >= 2) {
                 Sparkline(

@@ -1,5 +1,6 @@
 package de.universam.victron.mobile.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +10,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -30,8 +34,11 @@ private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 private val TEXT_PRIMARY = Color(VictronPalette.TEXT)
 private val BATTERY = Color(VictronPalette.BATTERY)
 private val YIELD = Color(VictronPalette.YIELD)
+private val CHARGING = Color(VictronPalette.CHARGING)
 private val ERROR = Color(VictronPalette.ERROR)
 private val TRACK = Color(0xFF1A2332)
+private val SURFACE = Color(0xFF121E2E)
+private val SURFACE_LIGHT = Color(0xFF1A2940)
 
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
@@ -54,6 +61,7 @@ fun DeviceDashboard(
     } else {
         values?.chargerStateLabel
     }
+    val stateColor = if (values?.hasError == true) ERROR else CHARGING
 
     Column(
         modifier = modifier
@@ -85,13 +93,12 @@ fun DeviceDashboard(
             HorizontalDivider(color = TRACK, thickness = 1.dp)
         }
 
-        // PV Arc Gauge — dominant visual, with state label and sparkline inside
+        // PV Arc Gauge — dominant visual, with sparkline inside
         PvArcGauge(
             fraction = snapshot.pvFraction(peakWatts),
             watts = values?.pvPowerW,
             scaleMaxW = scaleMax,
             stale = stale,
-            stateLabel = stateLabel,
             sparklineValues = history?.pvPowerW.orEmpty(),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -104,7 +111,7 @@ fun DeviceDashboard(
             sparklineValues = history?.batteryCurrent.orEmpty(),
         )
 
-        // Value tiles grid — voltage + yield with sparklines
+        // Value tiles grid — voltage, yield, charger state, (+ load if available)
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -127,13 +134,40 @@ fun DeviceDashboard(
             )
         }
 
-        // Load tile — only when load current is available
-        val loadCurrent = values?.loadCurrent
-        if (loadCurrent != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Charger state tile — accent-washed box matching ValueTile style
+            val chipColor = if (stale) TEXT_DIM else stateColor
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Brush.verticalGradient(listOf(SURFACE_LIGHT, SURFACE)))
+                    .background(chipColor.copy(alpha = 0.12f))
+                    .padding(16.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
+                Column {
+                    Text(
+                        text = stringResource(R.string.label_state),
+                        fontSize = 12.sp,
+                        color = TEXT_DIM,
+                    )
+                    Text(
+                        text = stateLabel ?: Formatting.PLACEHOLDER,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = chipColor,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+
+            // Load tile — or empty spacer
+            val loadCurrent = values?.loadCurrent
+            if (loadCurrent != null) {
                 ValueTile(
                     label = stringResource(R.string.label_load),
                     value = Formatting.amps(loadCurrent),
@@ -142,6 +176,7 @@ fun DeviceDashboard(
                     modifier = Modifier.weight(1f),
                     sparklineValues = history?.loadCurrent.orEmpty(),
                 )
+            } else {
                 Box(modifier = Modifier.weight(1f))
             }
         }
