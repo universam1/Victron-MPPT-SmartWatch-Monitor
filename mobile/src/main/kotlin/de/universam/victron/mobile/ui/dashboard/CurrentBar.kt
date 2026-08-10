@@ -71,14 +71,14 @@ fun CurrentBar(
             )
         }
 
-        // Sparkline above the bar
+        // Sparkline above the bar — double height for prominence
         if (sparklineValues.size >= 2) {
             Sparkline(
                 values = sparklineValues,
                 color = barColor,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp),
+                    .height(72.dp),
             )
         }
 

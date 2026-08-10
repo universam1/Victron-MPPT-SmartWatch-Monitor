@@ -1,6 +1,5 @@
 package de.universam.victron.mobile.ui.dashboard
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,14 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,10 +30,8 @@ private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 private val TEXT_PRIMARY = Color(VictronPalette.TEXT)
 private val BATTERY = Color(VictronPalette.BATTERY)
 private val YIELD = Color(VictronPalette.YIELD)
-private val CHARGING = Color(VictronPalette.CHARGING)
 private val ERROR = Color(VictronPalette.ERROR)
 private val TRACK = Color(0xFF1A2332)
-private val SURFACE = Color(0xFF121E2E)
 
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
@@ -59,7 +54,6 @@ fun DeviceDashboard(
     } else {
         values?.chargerStateLabel
     }
-    val stateColor = if (values?.hasError == true) ERROR else CHARGING
 
     Column(
         modifier = modifier
@@ -102,28 +96,6 @@ fun DeviceDashboard(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // Charger state chip
-        if (stateLabel != null) {
-            Box(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                val chipColor = if (stale) TEXT_DIM else stateColor
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SURFACE)
-                        .background(chipColor.copy(alpha = 0.12f))
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = stateLabel,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = chipColor,
-                    )
-                }
-            }
-        }
 
         // Battery Current bar with sparkline
         CurrentBar(

@@ -59,13 +59,37 @@ private val sampleSnapshot = DeviceSnapshot(
 @Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
 fun PreviewPowerArc() {
-    Box(modifier = Modifier.size(240.dp).background(BACKGROUND).padding(3.dp)) {
+    val solar = Color(VictronPalette.SOLAR)
+    Box(
+        modifier = Modifier.size(240.dp).background(BACKGROUND).padding(3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         PowerArc(
             fraction = 0.4f,
-            color = Color(VictronPalette.SOLAR),
+            color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
         )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "142",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = solar,
+                )
+                Text(
+                    text = " W",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(VictronPalette.TEXT_DIM),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            Text(
+                text = "Bulk",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(VictronPalette.TEXT_DIM),
+            )
+        }
     }
 }
 
