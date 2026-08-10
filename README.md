@@ -3,11 +3,20 @@
 Read a Victron **SmartSolar / BlueSolar MPPT** straight from your wrist — connectionless, over the
 device's BLE *Instant Readout* advertisements. A Wear OS **tile** shows solar power, battery
 voltage/current, charger state and today's yield at a glance; the full watch app adds details,
-device discovery and key entry; the same code also ships as a phone app.
+device discovery and key entry; the phone app gives you a fullscreen animated dashboard.
+
+<p align="center">
+  <img src="docs/screenshots/mobile-dashboard.png" width="280" alt="Phone dashboard — glowing arc gauge, sparklines, navy gradient" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/watch-face.png" width="200" alt="Watch face — power arc with glow, battery chips, yield" />
+</p>
 
 * No connection to the charger: VictronConnect keeps working while you watch.
 * No phone required — the watch app is standalone and scans with the watch's own radio.
 * No IDE required — everything builds in Docker with one script.
+* **Phone dashboard** — auto-navigates to a fullscreen view with glowing arc gauge, animated
+  battery bar, sparkline trend graphs on every metric, and swipe between devices.
+* **Watch face** — full-bezel power gauge with glow halo, battery chips, yield + age.
 
 ```
         ╭─────────────────────╮        arc = PV power against your array size
@@ -23,6 +32,17 @@ device discovery and key entry; the same code also ships as a phone app.
 ```
 
 The tile draws the same gauge, so tile and app never look like two different apps.
+
+### Stale data is always visible — never hidden
+
+When the charger goes out of range, values dim and the age turns red. You always know how fresh
+your reading is.
+
+<p align="center">
+  <img src="docs/screenshots/mobile-dashboard-stale.png" width="280" alt="Stale dashboard — all values dimmed, age in red" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/watch-arc.png" width="200" alt="Watch power arc with glow" />
+</p>
 
 ## Getting started
 
