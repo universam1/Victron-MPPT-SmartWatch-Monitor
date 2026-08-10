@@ -145,7 +145,7 @@ private fun Gauge(
         // Device name doubles as the device switcher when more than one charger is in range.
         Text(
             text = if (deviceCount > 1) "${snapshot.displayName}  ›" else snapshot.displayName,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = Color(VictronPalette.TEXT_DIM),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -162,15 +162,15 @@ private fun Gauge(
         ) {
             Text(
                 text = values?.pvPowerW?.toString() ?: Formatting.PLACEHOLDER,
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.displayLarge,
                 color = solar,
                 maxLines = 1,
             )
             Text(
                 text = " W",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = Color(VictronPalette.TEXT_DIM),
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier.padding(bottom = 6.dp),
             )
         }
 
@@ -179,7 +179,7 @@ private fun Gauge(
                 values?.hasError == true -> values.chargerErrorLabel ?: stringResource(R.string.label_error)
                 else -> values?.chargerStateLabel ?: Formatting.PLACEHOLDER
             },
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = if (values?.hasError == true) {
                 Color(VictronPalette.ERROR)
             } else {
@@ -208,7 +208,7 @@ private fun Gauge(
 
         Text(
             text = "${Formatting.energy(values?.yieldTodayWh)} · ${Formatting.age(snapshot, now)}",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = Color(VictronPalette.YIELD),
             maxLines = 1,
             modifier = Modifier.padding(top = 4.dp),
@@ -303,11 +303,11 @@ private fun ValueChip(text: String, color: Color) {
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(Color(VictronPalette.SURFACE))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = color,
             maxLines = 1,
         )

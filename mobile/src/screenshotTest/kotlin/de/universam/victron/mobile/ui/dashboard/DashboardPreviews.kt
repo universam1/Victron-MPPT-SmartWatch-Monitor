@@ -71,13 +71,13 @@ private val staleSnapshot = sampleSnapshot.copy(
 @Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 390, heightDp = 800)
 @Composable
 fun PreviewDeviceDashboard() {
-    val history = ReadingHistory().apply {
-        sampleSparkline.forEach { batteryCurrent.add(it) }
-        sampleVoltageSparkline.forEach { batteryVoltage.add(it) }
-        samplePowerSparkline.forEach { pvPowerW.add(it) }
-        sampleYieldSparkline.forEach { yieldTodayWh.add(it) }
-        sampleSparkline.forEach { loadCurrent.add(it * 0.3f) }
-    }
+    val history = ReadingHistory(
+        batteryCurrent = sampleSparkline.toList(),
+        batteryVoltage = sampleVoltageSparkline.toList(),
+        pvPowerW = samplePowerSparkline.toList(),
+        yieldTodayWh = sampleYieldSparkline.toList(),
+        loadCurrent = sampleSparkline.map { it * 0.3f },
+    )
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = sampleSnapshot,
