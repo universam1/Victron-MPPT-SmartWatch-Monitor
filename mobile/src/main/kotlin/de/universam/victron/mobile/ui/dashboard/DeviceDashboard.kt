@@ -91,13 +91,14 @@ fun DeviceDashboard(
             HorizontalDivider(color = TRACK, thickness = 1.dp)
         }
 
-        // PV Arc Gauge — dominant visual, with state label inside
+        // PV Arc Gauge — dominant visual, with state label and sparkline inside
         PvArcGauge(
             fraction = snapshot.pvFraction(peakWatts),
             watts = values?.pvPowerW,
             scaleMaxW = scaleMax,
             stale = stale,
             stateLabel = stateLabel,
+            sparklineValues = history?.pvPowerW.orEmpty(),
             modifier = Modifier.fillMaxWidth(),
         )
 

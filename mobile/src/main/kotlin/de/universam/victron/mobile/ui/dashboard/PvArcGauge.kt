@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,13 +32,12 @@ private const val SWEEP_ANGLE = 240f
 private val SOLAR = Color(VictronPalette.SOLAR)
 private val SOLAR_GLOW = Color(0xFF_FFD54F).copy(alpha = 0.35f)
 private val TRACK = Color(0xFF1A2332)
-private val TRACK_INNER = Color(0xFF141C28)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 private val TEXT_PRIMARY = Color(VictronPalette.TEXT)
 
 /**
  * Large animated arc gauge showing PV power. A glow arc drawn behind the main arc gives depth;
- * the watts value sits centered inside with the scale below.
+ * the watts value sits centered inside with an optional sparkline trend below.
  */
 @Composable
 fun PvArcGauge(
@@ -45,6 +46,7 @@ fun PvArcGauge(
     scaleMaxW: Int,
     stale: Boolean,
     stateLabel: String? = null,
+    sparklineValues: List<Float> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val animated by animateFloatAsState(
@@ -102,26 +104,40 @@ fun PvArcGauge(
             }
         }
 
-        // Center text
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Center content: text + sparkline
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 40.dp),
+        ) {
             Text(
                 text = Formatting.watts(watts),
                 fontSize = 56.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (stale) TEXT_DIM else SOLAR,
+                color = if (stale) TEXT_DIM else Color.White,
             )
             Text(
                 text = "of $scaleMaxW W",
                 fontSize = 14.sp,
-                color = TEXT_DIM,
+                color = if (stale) TEXT_DIM else SOLAR,
             )
             if (stateLabel != null) {
                 Text(
                     text = stateLabel,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (stale) TEXT_DIM else TEXT_PRIMARY,
                     modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            // Power sparkline inside the arc
+            if (sparklineValues.size >= 2) {
+                Sparkline(
+                    values = sparklineValues,
+                    color = if (stale) TEXT_DIM else SOLAR,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .padding(top = 6.dp),
                 )
             }
         }

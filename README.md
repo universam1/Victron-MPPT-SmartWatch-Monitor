@@ -18,19 +18,6 @@ device discovery and key entry; the phone app gives you a fullscreen animated da
   battery bar, sparkline trend graphs on every metric, and swipe between devices.
 * **Watch face** — full-bezel power gauge with glow halo, battery chips, yield + age.
 
-```
-        ╭─────────────────────╮        arc = PV power against your array size
-      ╱   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁    ╲
-     │    SmartSolar 100/30  ›  │      tap the name to switch device
-     │                          │
-     │        142 W             │      ← solar yellow
-     │        Absorption        │
-     │    13.88 V    1.4 A      │      ← battery blue · charging green
-     │      0.42 kWh · 8s       │      ← yield green · age of the reading
-      ╲            ⚙           ╱
-        ╰─────────────────────╯
-```
-
 The tile draws the same gauge, so tile and app never look like two different apps.
 
 ### Stale data is always visible — never hidden
@@ -40,8 +27,6 @@ your reading is.
 
 <p align="center">
   <img src="docs/screenshots/mobile-dashboard-stale.png" width="280" alt="Stale dashboard — all values dimmed, age in red" />
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/watch-arc.png" width="200" alt="Watch power arc with glow" />
 </p>
 
 ## Getting started
