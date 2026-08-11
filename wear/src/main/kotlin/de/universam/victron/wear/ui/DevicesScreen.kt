@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -99,6 +100,17 @@ fun DevicesScreen(
             Button(onClick = onDebugClick, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_debug))
             }
+        }
+
+        item {
+            val context = LocalContext.current
+            val version = context.packageManager
+                .getPackageInfo(context.packageName, 0).versionName ?: ""
+            Text(
+                text = "v$version",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

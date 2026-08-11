@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -254,6 +255,18 @@ private fun SetupContent(
             OutlinedButton(onClick = { viewModel.requestScanNow() }) {
                 Text(stringResource(R.string.scan_now))
             }
+        }
+
+        item {
+            val context = LocalContext.current
+            val version = context.packageManager
+                .getPackageInfo(context.packageName, 0).versionName ?: ""
+            Text(
+                text = "v$version",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 16.dp),
+            )
         }
     }
 }
