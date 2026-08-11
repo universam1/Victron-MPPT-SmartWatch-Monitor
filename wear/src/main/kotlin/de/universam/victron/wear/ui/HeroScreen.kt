@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,11 +84,10 @@ fun HeroScreen(
 
     val pagerState = rememberPagerState { 2 }
 
-    // Swipe to page 1 → open settings
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage == 1) {
-            onOpenDevices()
-        }
+    // Swipe to page 1 → open settings (fires only when page fully settles)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .collect { page -> if (page == 1) onOpenDevices() }
     }
 
     HorizontalPager(
@@ -162,8 +162,6 @@ private fun GaugeList(
                 peakWatts = peakWatts,
                 batteryCurrentMax = batteryCurrentMax,
                 now = now,
-                solar = solar,
-                currentColor = currentColor,
                 deviceCount = deviceCount,
                 onCycleDevice = onCycleDevice,
             )
@@ -260,12 +258,17 @@ internal fun GaugeFace(
     peakWatts: Int,
     batteryCurrentMax: Double,
     now: Long,
-    solar: Color,
-    currentColor: Color,
     deviceCount: Int = 1,
     onCycleDevice: () -> Unit = {},
 ) {
     val values = snapshot.solarCharger
+    val stale = Formatting.isStale(snapshot, now)
+    val solar = if (stale) Color(VictronPalette.TEXT_DIM) else Color(VictronPalette.SOLAR)
+    val currentColor = if (stale) {
+        Color(VictronPalette.TEXT_DIM)
+    } else {
+        Color(VictronPalette.currentColor(values?.batteryCurrent))
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()

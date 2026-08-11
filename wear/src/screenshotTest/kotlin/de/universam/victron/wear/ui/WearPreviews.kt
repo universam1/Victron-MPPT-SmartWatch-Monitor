@@ -106,19 +106,12 @@ fun PreviewPowerArc() {
 @Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
 fun PreviewWatchFace() {
-    val values = sampleSnapshot.solarCharger
-    val solar = Color(VictronPalette.SOLAR)
-    val currentColor = Color(VictronPalette.currentColor(values?.batteryCurrent))
-    val now = System.currentTimeMillis()
-
     Box(modifier = Modifier.size(240.dp)) {
         GaugeFace(
             snapshot = sampleSnapshot,
             peakWatts = 380,
             batteryCurrentMax = 15.0,
-            now = now,
-            solar = solar,
-            currentColor = currentColor,
+            now = System.currentTimeMillis(),
         )
     }
 }
