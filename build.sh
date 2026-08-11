@@ -17,6 +17,11 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+
+# Source signing env vars from .env if present (not checked into git).
+# shellcheck disable=SC1091
+[[ -f .env ]] && set -a && source .env && set +a
+
 COMPOSE_FILE="docker/docker-compose.yml"
 
 run_gradle() {

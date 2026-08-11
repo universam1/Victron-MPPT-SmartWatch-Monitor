@@ -12,5 +12,6 @@ captures/
 *.keystore
 *.jks
 keystore.properties
+.env
 dist/
 !gradle/wrapper/gradle-wrapper.jar
