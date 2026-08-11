@@ -157,107 +157,16 @@ private fun GaugeList(
     ) {
         // ── First item: fullscreen gauge with arcs ──
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(VictronPalette.BACKGROUND)),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Outer arc: PV power
-                PowerArc(
-                    fraction = snapshot.pvFraction(peakWatts),
-                    color = solar,
-                    trackColor = Color(VictronPalette.TRACK),
-                    modifier = Modifier.fillMaxSize(),
-                )
-
-                // Bottom arc: battery current
-                PowerArc(
-                    fraction = snapshot.batteryCurrentFraction(batteryCurrentMax),
-                    color = currentColor,
-                    trackColor = Color(VictronPalette.TRACK),
-                    modifier = Modifier.fillMaxSize(),
-                    strokeWidth = 11.dp,
-                    startAngle = 38f,
-                    sweepAngle = 104f,
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    // Device name — tap to cycle
-                    Text(
-                        text = if (deviceCount > 1) "${snapshot.displayName}  ›" else snapshot.displayName,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(VictronPalette.TEXT_DIM),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = deviceCount > 1, onClick = onCycleDevice)
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
-                    )
-
-                    // PV Watts — large
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Icon(
-                            imageVector = Icons.Filled.WbSunny,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp).padding(end = 2.dp, bottom = 8.dp),
-                            tint = solar,
-                        )
-                        Text(
-                            text = values?.pvPowerW?.toString() ?: Formatting.PLACEHOLDER,
-                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp),
-                            color = solar,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = " W",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color(VictronPalette.TEXT_DIM),
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-
-                    // Battery Amps — slightly smaller than watts
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Icon(
-                            imageVector = Icons.Filled.BatteryChargingFull,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp).padding(end = 2.dp, bottom = 5.dp),
-                            tint = currentColor,
-                        )
-                        Text(
-                            text = values?.batteryCurrent?.let {
-                                String.format(java.util.Locale.US, "%.1f", it)
-                            } ?: Formatting.PLACEHOLDER,
-                            style = MaterialTheme.typography.displayMedium,
-                            color = currentColor,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = " A",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color(VictronPalette.TEXT_DIM),
-                            modifier = Modifier.padding(bottom = 5.dp),
-                        )
-                    }
-
-                    // Age indicator
-                    Text(
-                        text = Formatting.age(snapshot, now),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(VictronPalette.TEXT_DIM),
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
+            GaugeFace(
+                snapshot = snapshot,
+                peakWatts = peakWatts,
+                batteryCurrentMax = batteryCurrentMax,
+                now = now,
+                solar = solar,
+                currentColor = currentColor,
+                deviceCount = deviceCount,
+                onCycleDevice = onCycleDevice,
+            )
         }
 
         // ── Detail rows as Wear M3 Buttons ──
@@ -339,6 +248,115 @@ private fun GaugeList(
                 label = stringResource(R.string.label_age),
                 value = Formatting.age(snapshot, now),
                 valueColor = Color(VictronPalette.TEXT_DIM),
+            )
+        }
+    }
+}
+
+/** The gauge face — arcs + large watts/amps. Extracted so previews reuse the real UI. */
+@Composable
+internal fun GaugeFace(
+    snapshot: DeviceSnapshot,
+    peakWatts: Int,
+    batteryCurrentMax: Double,
+    now: Long,
+    solar: Color,
+    currentColor: Color,
+    deviceCount: Int = 1,
+    onCycleDevice: () -> Unit = {},
+) {
+    val values = snapshot.solarCharger
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(VictronPalette.BACKGROUND)),
+        contentAlignment = Alignment.Center,
+    ) {
+        PowerArc(
+            fraction = snapshot.pvFraction(peakWatts),
+            color = solar,
+            trackColor = Color(VictronPalette.TRACK),
+            modifier = Modifier.fillMaxSize(),
+        )
+        PowerArc(
+            fraction = snapshot.batteryCurrentFraction(batteryCurrentMax),
+            color = currentColor,
+            trackColor = Color(VictronPalette.TRACK),
+            modifier = Modifier.fillMaxSize(),
+            strokeWidth = 11.dp,
+            startAngle = 38f,
+            sweepAngle = 104f,
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = if (deviceCount > 1) "${snapshot.displayName}  ›" else snapshot.displayName,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(VictronPalette.TEXT_DIM),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = deviceCount > 1, onClick = onCycleDevice)
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+            )
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Icon(
+                    imageVector = Icons.Filled.WbSunny,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp).padding(end = 2.dp, bottom = 8.dp),
+                    tint = solar,
+                )
+                Text(
+                    text = values?.pvPowerW?.toString() ?: Formatting.PLACEHOLDER,
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp),
+                    color = solar,
+                    maxLines = 1,
+                )
+                Text(
+                    text = " W",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color(VictronPalette.TEXT_DIM),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Icon(
+                    imageVector = Icons.Filled.BatteryChargingFull,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp).padding(end = 2.dp, bottom = 5.dp),
+                    tint = currentColor,
+                )
+                Text(
+                    text = values?.batteryCurrent?.let {
+                        String.format(java.util.Locale.US, "%.1f", it)
+                    } ?: Formatting.PLACEHOLDER,
+                    style = MaterialTheme.typography.displayMedium,
+                    color = currentColor,
+                    maxLines = 1,
+                )
+                Text(
+                    text = " A",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color(VictronPalette.TEXT_DIM),
+                    modifier = Modifier.padding(bottom = 5.dp),
+                )
+            }
+
+            Text(
+                text = Formatting.age(snapshot, now),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(VictronPalette.TEXT_DIM),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }

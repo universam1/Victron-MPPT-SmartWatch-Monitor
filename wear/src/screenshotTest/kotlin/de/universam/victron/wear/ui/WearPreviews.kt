@@ -109,81 +109,17 @@ fun PreviewWatchFace() {
     val values = sampleSnapshot.solarCharger
     val solar = Color(VictronPalette.SOLAR)
     val currentColor = Color(VictronPalette.currentColor(values?.batteryCurrent))
+    val now = System.currentTimeMillis()
 
-    Box(
-        modifier = Modifier.size(240.dp).background(BACKGROUND),
-        contentAlignment = Alignment.Center,
-    ) {
-        PowerArc(
-            fraction = sampleSnapshot.pvFraction(380),
-            color = solar,
-            trackColor = Color(VictronPalette.TRACK),
-            modifier = Modifier.fillMaxSize().padding(3.dp),
+    Box(modifier = Modifier.size(240.dp)) {
+        GaugeFace(
+            snapshot = sampleSnapshot,
+            peakWatts = 380,
+            batteryCurrentMax = 15.0,
+            now = now,
+            solar = solar,
+            currentColor = currentColor,
         )
-
-        PowerArc(
-            fraction = sampleSnapshot.batteryCurrentFraction(15.0),
-            color = currentColor,
-            trackColor = Color(VictronPalette.TRACK),
-            modifier = Modifier.fillMaxSize().padding(3.dp),
-            strokeWidth = 11.dp,
-            startAngle = 38f,
-            sweepAngle = 104f,
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = sampleSnapshot.displayName,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(VictronPalette.TEXT_DIM),
-            )
-
-            // PV Watts — large
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = values?.pvPowerW?.toString() ?: Formatting.PLACEHOLDER,
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp),
-                    color = solar,
-                )
-                Text(
-                    text = " W",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color(VictronPalette.TEXT_DIM),
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
-
-            // Battery Amps — slightly smaller
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = values?.batteryCurrent?.let {
-                        String.format(java.util.Locale.US, "%.1f", it)
-                    } ?: Formatting.PLACEHOLDER,
-                    style = MaterialTheme.typography.displayMedium,
-                    color = currentColor,
-                )
-                Text(
-                    text = " A",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color(VictronPalette.TEXT_DIM),
-                    modifier = Modifier.padding(bottom = 5.dp),
-                )
-            }
-
-            // Age
-            Text(
-                text = Formatting.age(sampleSnapshot, System.currentTimeMillis()),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(VictronPalette.TEXT_DIM),
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
     }
 }
 
