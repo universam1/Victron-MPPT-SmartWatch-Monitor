@@ -1,6 +1,6 @@
 # Victron MPPT SmartWatch Monitor
 
-Wear OS tile + app (and a phone app) that read a Victron SmartSolar/BlueSolar MPPT from its
+Wear OS app + tile (and a phone app) that read a Victron SmartSolar/BlueSolar MPPT from its
 connectionless BLE *Instant Readout* advertisements. Kotlin, Gradle, builds headless in Docker.
 
 ## Build & test
@@ -33,7 +33,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 |---|---|
 | `protocol` | `VictronAdvertisement` (header), `VictronCipher` (AES-CTR), `BitReader`, `records/*`, `VictronModels` |
 | `data` | `VictronScanner`, `VictronRepository`, `VictronViewModel`, `ScanWorker`/`ScanScheduler`, DataStore, `Formatting` |
-| `wear` | Compose for Wear OS screens + `tile/VictronTileService` |
+| `wear` | Compose for Wear OS: scrollable gauge + detail list, tile, navigation (Hero → Overview → Devices) |
 | `mobile` | Compose Material 3 screens |
 
 ## Rules that matter (do not break these)
@@ -78,6 +78,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 
 - Kotlin explicit API mode in `protocol`; `public` modifiers kept in `data` for the same reason.
 - UI strings go through `strings.xml` with a German `values-de` translation. No hardcoded user text.
-- Wear UI sticks to a conservative Compose-for-Wear-OS subset (`ScalingLazyColumn`, `Card`,
-  `Button`, `ListHeader`, `Text`) — the tiny keypad keys are plain clickable boxes on purpose.
+- Wear UI sticks to a conservative Compose-for-Wear-OS subset (`ScalingLazyColumn`, `Button`,
+  `ListHeader`, `Text`, Material Icons Extended) — HeroScreen is a `ScalingLazyColumn` whose first
+  item is the fullscreen gauge and following items are detail buttons. No separate detail route.
 - No dependency injection framework: `VictronData` is the whole graph.

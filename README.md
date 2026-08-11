@@ -2,13 +2,16 @@
 
 Read a Victron **SmartSolar / BlueSolar MPPT** straight from your wrist — connectionless, over the
 device's BLE *Instant Readout* advertisements. A Wear OS **tile** shows solar power, battery
-voltage/current, charger state and today's yield at a glance; the full watch app adds details,
-device discovery and key entry; the phone app gives you a fullscreen animated dashboard.
+voltage/current, charger state and today's yield at a glance; the full watch app scrolls down
+into all values, device discovery and key entry; the phone app gives you a fullscreen animated
+dashboard.
 
 <p align="center">
-  <img src="docs/screenshots/mobile-dashboard.png" width="280" alt="Phone dashboard — glowing arc gauge, sparklines, navy gradient" />
+  <img src="mobile/src/screenshotTestDebug/reference/de/universam/victron/mobile/ui/dashboard/DashboardPreviewsKt/PreviewDeviceDashboard_70e2a6a0_0.png" width="280" alt="Phone dashboard — glowing arc gauge, sparklines, navy gradient" />
   &nbsp;&nbsp;
-  <img src="docs/screenshots/watch-face.png" width="200" alt="Watch face — power arc with glow, battery chips, yield" />
+  <img src="wear/src/screenshotTestDebug/reference/de/universam/victron/wear/ui/WearPreviewsKt/PreviewWatchFace_93d39f98_0.png" width="200" alt="Watch face — power arc with large watts and amps" />
+  &nbsp;&nbsp;
+  <img src="wear/src/screenshotTestDebug/reference/de/universam/victron/wear/ui/WearPreviewsKt/PreviewDetailList_93d39f98_0.png" width="200" alt="Watch detail list — scrollable button rows" />
 </p>
 
 * No connection to the charger: VictronConnect keeps working while you watch.
@@ -16,7 +19,7 @@ device discovery and key entry; the phone app gives you a fullscreen animated da
 * No IDE required — everything builds in Docker with one script.
 * **Phone dashboard** — auto-navigates to a fullscreen view with glowing arc gauge, animated
   battery bar, sparkline trend graphs on every metric, and swipe between devices.
-* **Watch face** — full-bezel power gauge with glow halo, battery chips, yield + age.
+* **Watch face** — full-bezel power gauge with large watts and amps, scrolls down into a detail list with all values.
 
 The tile draws the same gauge, so tile and app never look like two different apps.
 
@@ -26,7 +29,7 @@ When the charger goes out of range, values dim and the age turns red. You always
 your reading is.
 
 <p align="center">
-  <img src="docs/screenshots/mobile-dashboard-stale.png" width="280" alt="Stale dashboard — all values dimmed, age in red" />
+  <img src="mobile/src/screenshotTestDebug/reference/de/universam/victron/mobile/ui/dashboard/DashboardPreviewsKt/PreviewDeviceDashboardStale_70e2a6a0_0.png" width="280" alt="Stale dashboard — all values dimmed, age in red" />
 </p>
 
 ## Getting started

@@ -27,10 +27,8 @@ internal object Route {
     const val OVERVIEW = "overview"
     const val DEVICES = "devices"
     const val DEBUG = "debug"
-    const val DETAIL = "detail/{address}"
     const val KEY_ENTRY = "key/{address}"
 
-    fun detail(address: String): String = "detail/$address"
     fun keyEntry(address: String): String = "key/$address"
 }
 
@@ -53,14 +51,13 @@ fun VictronApp(viewModel: VictronViewModel = viewModel()) {
                 composable(Route.HERO) {
                     HeroScreen(
                         viewModel = viewModel,
-                        onOpenDetail = { address -> navController.navigate(Route.detail(address)) },
                         onOpenDevices = { navController.navigate(Route.OVERVIEW) },
                     )
                 }
                 composable(Route.OVERVIEW) {
                     OverviewScreen(
                         viewModel = viewModel,
-                        onDeviceClick = { address -> navController.navigate(Route.detail(address)) },
+                        onDeviceClick = { _ -> navController.popBackStack() },
                         onNeedsKey = { address -> navController.navigate(Route.keyEntry(address)) },
                         onSettingsClick = { navController.navigate(Route.DEVICES) },
                     )
@@ -74,12 +71,6 @@ fun VictronApp(viewModel: VictronViewModel = viewModel()) {
                 }
                 composable(Route.DEBUG) {
                     DebugScreen(viewModel = viewModel)
-                }
-                composable(Route.DETAIL) { entry ->
-                    DetailScreen(
-                        viewModel = viewModel,
-                        address = entry.arguments?.getString("address").orEmpty(),
-                    )
                 }
                 composable(Route.KEY_ENTRY) { entry ->
                     KeyEntryScreen(

@@ -7,7 +7,7 @@ protocol/   pure Kotlin/JVM — header parsing, AES-CTR, bit unpacking, model id
    ▲        no Android dependency, unit tested against a real advertisement
 data/       Android library — BLE scanning, decoding, persistence, ViewModel, WorkManager
    ▲
-   ├── wear/    Wear OS app: Compose for Wear OS (Material 3) + the tile
+   ├── wear/    Wear OS app: Compose for Wear OS (Material 3) + tile
    └── mobile/  phone app: Compose Material 3
 ```
 
@@ -98,10 +98,11 @@ this automatically.
 
 ## Watch UI
 
-The main screen is a gauge, not a list: a 240° arc along the bezel for PV power, the watts in the
-middle, and the battery values as colour-coded chips underneath — the reading order VictronConnect
-trained everyone on. The tile draws the same gauge with two overlaid ProtoLayout `Arc`s so tile and
-app cannot drift apart.
+HeroScreen is a `ScalingLazyColumn`: the first item is a fullscreen gauge (240° arc along the bezel
+for PV power, watts/amps in the centre), and the following items are Wear M3 Buttons with Material
+Icons showing battery voltage, solar power, charger state, yield, load, signal, model, and age.
+Scrolling the gauge reveals the detail list — there is no separate detail route. Navigation is
+Hero → Overview → Devices.
 
 Colours come from one place, `data/VictronPalette.kt`, as ARGB ints, because the tile knows nothing
 about Compose: yellow = solar, blue = battery, green = current going in, orange = current going out,

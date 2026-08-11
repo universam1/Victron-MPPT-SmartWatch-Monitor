@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,11 +62,19 @@ fun CurrentBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = stringResource(R.string.label_battery_current),
-                fontSize = 14.sp,
-                color = TEXT_DIM,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.BatteryChargingFull,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp).padding(end = 4.dp),
+                    tint = TEXT_DIM,
+                )
+                Text(
+                    text = stringResource(R.string.label_battery_current),
+                    fontSize = 14.sp,
+                    color = TEXT_DIM,
+                )
+            }
             Text(
                 text = Formatting.amps(amps),
                 fontSize = 24.sp,
