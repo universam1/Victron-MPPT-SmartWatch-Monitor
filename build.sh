@@ -22,6 +22,14 @@ cd "$(dirname "$0")"
 # shellcheck disable=SC1091
 [[ -f .env ]] && set -a && source .env && set +a
 
+# Derive version from the latest git tag when not already set (CI sets these from the tag).
+if [[ -z "${VICTRON_VERSION_NAME:-}" ]]; then
+    tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+    export VICTRON_VERSION_NAME="${tag#v}"
+    IFS='.' read -r major minor patch <<< "${VICTRON_VERSION_NAME%%-*}"
+    export VICTRON_VERSION_CODE=$(( ${major:-0} * 10000 + ${minor:-0} * 100 + ${patch:-0} ))
+fi
+
 COMPOSE_FILE="docker/docker-compose.yml"
 
 run_gradle() {
