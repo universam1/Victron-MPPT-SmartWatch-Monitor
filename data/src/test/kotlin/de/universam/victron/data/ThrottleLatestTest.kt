@@ -107,7 +107,7 @@ class ThrottleLatestTest {
 
     @Test
     fun `a non-positive window is rejected`() {
-        assertThrows(IllegalArgumentException::class.java) { flowOf(1).throttleLatest(0) }
-        assertThrows(IllegalArgumentException::class.java) { flowOf(1).throttleLatest(-1) }
+        assertThrows<IllegalArgumentException> { flowOf(1).throttleLatest(0) }
+        assertThrows<IllegalArgumentException> { flowOf(1).throttleLatest(-1) }
     }
 }
