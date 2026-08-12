@@ -67,6 +67,23 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   Formatting turns `null` into `–`, so a missing value never looks like a real zero.
 - **Never scan continuously.** Scans are bounded: while a screen is visible, or a short expedited
   window from the tile/worker. Anything else drains a watch in hours.
+- **`ScanAggressiveness` is the only real power knob, and the screen-long scan stays `Balanced`.**
+  The duty cycle is fixed in `startScan`; dropping advertisements later saves a decode, not a
+  milliamp. `LowLatency` means a 100 % duty cycle receiver and belongs only to short bounded windows
+  (`scanOnce` from the tile/worker) where time-to-first-packet is the point. Don't raise
+  `collectAdvertisements`/`startLiveScan` back to `LowLatency` to make the gauge feel livelier —
+  the values change about once a second no matter how hard you listen.
+- **Repeat advertisements are filtered by reading, not by time.** A Victron repeats each reading on
+  three channels and the stack reports every reception, so the same reading arrives several times a
+  second. `collectAdvertisements` skips a `(recordTypeCode, nonce)` it just handled — the nonce is
+  the device's data counter, so this drops only genuine repeats and never delays a new reading. The
+  filter is per scan session: a restart must re-process what is on the air. A time-based rate limit
+  here would be wrong, because it cannot tell a repeat from a new reading.
+- **The UI observes snapshots and history through `throttleLatest` (2 Hz), the repository does not.**
+  Every emission redraws the gradient arc gauges and sparklines, so the cap is about redraw cost;
+  the repository still records every reading, which is what keeps the history buffer complete. Use
+  `throttleLatest`, not `sample` — `sample` runs a ticker for as long as the flow is collected, and
+  these flows live for the whole screen-on time, so an idle 2 Hz timer would cost more than it saves.
 - **The tile must not do BLE work in `onTileRequest`.** It renders the DataStore snapshot and asks
   `ScanScheduler` for a scan; the scan then calls `VictronTileService.requestUpdate`.
 - **Every surface shows the age of its data** (`Formatting.age`), and stale values are visibly

@@ -4,7 +4,10 @@ import de.universam.victron.data.model.SolarChargerValues
 
 /**
  * In-memory ring buffer of recent readings for sparkline graphs. Not persisted.
- * Capped at [MAX_ENTRIES] per metric (~60 readings ≈ 1–2 minutes of live scan data).
+ *
+ * Capped at [MAX_ENTRIES] per metric. One entry per *reading*, not per radio reception — the
+ * repository filters repeats of the same advertisement before appending — so at a Victron's ~1 Hz
+ * advertising rate 60 entries is roughly the last minute.
  *
  * Immutable: [append] returns a new instance so that Compose observes the change when the
  * containing StateFlow is updated (reference equality on `List` is what triggers recomposition).

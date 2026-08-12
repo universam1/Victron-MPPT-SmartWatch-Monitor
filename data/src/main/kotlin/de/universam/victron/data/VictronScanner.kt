@@ -27,7 +27,23 @@ public class RawAdvertisement(
     public val receivedAtEpochMillis: Long,
 )
 
-/** Scan aggressiveness. Battery cost rises steeply from [Balanced] to [LowLatency]. */
+/**
+ * Scan aggressiveness — the one knob that actually decides what a scan costs.
+ *
+ * The receiver duty cycle is fixed here, at `startScan` time; nothing downstream can undo it.
+ * Throwing advertisements away in the callback saves a decode, not a milliamp: by then the radio
+ * has already listened and the process has already been woken. AOSP's default windows:
+ *
+ * | Mode | Window / interval | Duty cycle | Time to first packet from a 1 Hz advertiser |
+ * |---|---|---|---|
+ * | [LowPower] | 512 ms / 5120 ms | ~10 % | ~10 s |
+ * | [Balanced] | 1024 ms / 4096 ms | ~25 % | a few seconds |
+ * | [LowLatency] | 4096 ms / 4096 ms | 100 % | immediate |
+ *
+ * Devices may override those numbers, but the ratios hold. [Balanced] is the right default for a
+ * scan that runs for as long as a screen is visible; [LowLatency] is for short bounded windows
+ * where time to first packet *is* the feature, i.e. the tile refresh and the "scan now" button.
+ */
 public enum class ScanAggressiveness(internal val settingsMode: Int) {
     LowPower(ScanSettings.SCAN_MODE_LOW_POWER),
     Balanced(ScanSettings.SCAN_MODE_BALANCED),

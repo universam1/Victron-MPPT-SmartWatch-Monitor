@@ -14,6 +14,7 @@ import de.universam.victron.protocol.ParseResult
 import de.universam.victron.protocol.VictronAdvertisement
 import de.universam.victron.protocol.VictronCipher
 import de.universam.victron.protocol.VictronDecoder
+import de.universam.victron.protocol.VictronHeader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,7 +70,11 @@ public class VictronRepository internal constructor(
     /**
      * Scans for [durationMillis] and updates [snapshots] while doing so.
      *
-     * @return the number of advertisements that produced a snapshot.
+     * [ScanAggressiveness.LowLatency] is right here and nowhere else: the window is short and
+     * bounded, so time to first packet is what decides whether the user sees fresh values at all.
+     *
+     * @return the number of distinct readings that produced a snapshot — repeats of the same
+     *   reading are filtered out, so this counts readings and not radio receptions.
      */
     public suspend fun scanOnce(
         durationMillis: Long,
@@ -87,9 +92,13 @@ public class VictronRepository internal constructor(
     /**
      * Collects advertisements until the caller's coroutine is cancelled, keeping [snapshots] up
      * to date. Use this while a screen is visible.
+     *
+     * Defaults to [ScanAggressiveness.Balanced] on purpose: this scan lasts as long as the screen,
+     * and [ScanAggressiveness.LowLatency] would keep the receiver on at a 100 % duty cycle for all
+     * of it. A Victron advertises about once a second, which `Balanced` catches within seconds.
      */
     public suspend fun collectAdvertisements(
-        aggressiveness: ScanAggressiveness = ScanAggressiveness.LowLatency,
+        aggressiveness: ScanAggressiveness = ScanAggressiveness.Balanced,
         onSnapshot: (DeviceSnapshot) -> Unit = {},
     ) {
         val currentConfig = configStore.data.first()
@@ -99,9 +108,26 @@ public class VictronRepository internal constructor(
                 .getOrNull()
         }.toMap()
 
+        // A Victron repeats each reading on all three advertising channels and the stack reports
+        // every reception, so the same reading arrives several times per second. The nonce is the
+        // device's own data counter, so it identifies a reading: skipping repeats of the one we
+        // just handled drops the redundant AES pass, snapshot map copy and history append without
+        // ever delaying a genuinely new reading. Rate limiting by time cannot make that promise.
+        //
+        // Local to the scan session on purpose — a restart (a key was saved, say) has to
+        // re-process whatever is currently on the air.
+        val lastReading = HashMap<String, Int>()
+
         scanner.advertisements(aggressiveness).collect { raw ->
-            val snapshot = decode(raw, currentConfig, keys) ?: return@collect
-            val address = snapshot.address.uppercase()
+            val header = (VictronAdvertisement.parse(raw.manufacturerData) as? ParseResult.Success)?.header
+                ?: return@collect
+            val address = raw.address.uppercase()
+            // Record type included because nothing promises one counter per device, only that a
+            // given reading keeps its counter.
+            val reading = (header.recordTypeCode shl 16) or header.nonce
+            if (lastReading.put(address, reading) == reading) return@collect
+
+            val snapshot = decode(raw, header, currentConfig, keys) ?: return@collect
             _snapshots.value = _snapshots.value + (address to snapshot.carryOver(_snapshots.value[address]))
             appendHistory(address, snapshot)
             onSnapshot(snapshot)
@@ -123,12 +149,10 @@ public class VictronRepository internal constructor(
 
     private fun decode(
         raw: RawAdvertisement,
+        header: VictronHeader,
         config: AppConfig,
         keys: Map<String, ByteArray>,
     ): DeviceSnapshot? {
-        val header = (VictronAdvertisement.parse(raw.manufacturerData) as? ParseResult.Success)?.header
-            ?: return null
-
         val address = raw.address.uppercase()
         // Prefer the key configured for this address. If none matches, fall back to any
         // configured key whose first byte equals the advertisement's key-check byte — that keeps

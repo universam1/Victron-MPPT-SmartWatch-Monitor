@@ -51,8 +51,16 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
     private val _syncState = MutableStateFlow<SyncResult>(SyncResult.Idle)
     public val syncState: StateFlow<SyncResult> = _syncState.asStateFlow()
 
-    /** Devices sorted so the useful ones come first: decoded, then discovered, then stale. */
+    /**
+     * Devices sorted so the useful ones come first: decoded, then discovered, then stale.
+     *
+     * Throttled ahead of the sort so neither the sort nor the recomposition it triggers runs more
+     * than [UI_UPDATE_WINDOW_MILLIS] apart. Every emission redraws the arc gauges, which are
+     * sweep-gradient `Canvas` work — worth doing when the reading changed, wasteful several times
+     * a second. The repository keeps recording every reading; only what the UI observes is capped.
+     */
     public val snapshots: StateFlow<List<DeviceSnapshot>> = repository.snapshots
+        .throttleLatest(UI_UPDATE_WINDOW_MILLIS)
         .map { snapshots ->
             snapshots.values.sortedWith(
                 compareBy(
@@ -66,8 +74,15 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
     public val config: StateFlow<AppConfig> = repository.config
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConfig())
 
-    /** Recent value history per device address, for sparkline graphs. */
+    /**
+     * Recent value history per device address, for sparkline graphs.
+     *
+     * Throttled like [snapshots] — a sparkline redraw per reading is the same wasted work. The
+     * buffer behind it still gets every reading, so no sample is missing from the curve.
+     */
     public val history: StateFlow<Map<String, ReadingHistory>> = repository.history
+        .throttleLatest(UI_UPDATE_WINDOW_MILLIS)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     private var scanJob: Job? = null
 
@@ -111,8 +126,15 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         }
     }
 
-    /** Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly. */
-    public fun startLiveScan(aggressiveness: ScanAggressiveness = ScanAggressiveness.LowLatency) {
+    /**
+     * Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly.
+     *
+     * This runs for as long as a screen is visible, so it takes the [ScanAggressiveness.Balanced]
+     * duty cycle. Do not raise it to [ScanAggressiveness.LowLatency] to make the gauge livelier:
+     * the values only change once a second anyway, and a 100 % duty cycle receiver for the whole
+     * screen-on time is the single most expensive thing this app can do.
+     */
+    public fun startLiveScan(aggressiveness: ScanAggressiveness = ScanAggressiveness.Balanced) {
         if (scanJob?.isActive == true) return
         repository.canScan()?.let {
             _scanState.value = ScanState.Unavailable(it)
@@ -198,5 +220,8 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
 
     private companion object {
         private const val TAG = "VictronViewModel"
+
+        /** 2 Hz — fast enough to look live for a value that updates about once a second. */
+        private const val UI_UPDATE_WINDOW_MILLIS = 500L
     }
 }
