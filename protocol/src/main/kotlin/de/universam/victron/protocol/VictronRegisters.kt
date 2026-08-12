@@ -3,52 +3,45 @@ package de.universam.victron.protocol
 import java.util.UUID
 
 /**
- * VE.Direct register definitions and the GATT framing used to read/write them over BLE.
+ * VE.Direct register definitions and BLE GATT UUIDs for the Victron SmartSolar MPPT.
  *
- * Victron devices expose a connected GATT service alongside their connectionless Instant Readout
- * advertisements. The service uses a proprietary framing that tunnels VE.Direct-style register
- * access over a single transport characteristic.
+ * From VictronConnect APK disassembly (authoritative source, mid-2026):
+ * - Single GATT service `68c10001` hosts both VeService (PIN, device info) and
+ *   VeSmartService (CBOR path-based protocol for settings).
+ * - Control characteristic `68c10002` carries opcodes and short messages.
+ * - Data characteristic `68c10003` carries CBOR-chunked path values.
  *
- * **This is reverse-engineered and not officially documented.** It works with current SmartSolar
- * firmware (as of mid-2026) but may break without notice.
+ * The VeSmartService protocol is path-based: the device reports its available paths
+ * (e.g. `/Settings/Load/OperationMode`) with integer indices; get/set use those indices,
+ * never raw vreg IDs. The vreg constants below are kept for documentation and for the
+ * VE.Direct serial fallback path.
  */
 public object VictronRegisters {
 
-    // ---- GATT UUIDs -------------------------------------------------------------------------
+    // ---- GATT UUIDs (from VictronConnect APK disassembly) ------------------------------------
 
     /**
-     * Victron SmartSolar BLE GATT services and characteristics.
-     *
-     * The SmartSolar uses THREE services:
-     * - `68c10001-...` — VE.Direct Smart (PIN code, device info)
-     * - `97580001-...` — vendor service (unknown purpose)
-     * - `306b0001-...` — **data service** (register reads/writes go here)
-     *
-     * Within the data service, three characteristics carry all traffic:
-     * - `306b0002` (handle 0x0021) — control: handshake + keepalive
-     * - `306b0003` (handle 0x0024) — single-value register messages
-     * - `306b0004` (handle 0x0027) — bulk/streaming register messages
+     * The single Victron BLE GATT service. Both VeService (PIN auth, device info, DFU) and
+     * VeSmartService (CBOR path-based settings) operate on this service.
      */
-    public val DATA_SERVICE_UUID: UUID =
-        UUID.fromString("306b0001-b081-4037-83dc-e59fcc3cdfd0")
-
-    /** Control characteristic — handshake + keepalive (handle 0x0021). */
-    public val CONTROL_UUID: UUID =
-        UUID.fromString("306b0002-b081-4037-83dc-e59fcc3cdfd0")
-
-    /** Single-value characteristic — register read/write (handle 0x0024). */
-    public val SINGLE_VALUE_UUID: UUID =
-        UUID.fromString("306b0003-b081-4037-83dc-e59fcc3cdfd0")
-
-    /** Bulk/streaming characteristic — multi-register ops (handle 0x0027). */
-    public val BULK_UUID: UUID =
-        UUID.fromString("306b0004-b081-4037-83dc-e59fcc3cdfd0")
-
-    /** VE.Direct Smart service — PIN code auth + device info. */
-    public val VE_DIRECT_SERVICE_UUID: UUID =
+    public val SERVICE_UUID: UUID =
         UUID.fromString("68c10001-b17f-4d3a-a290-34ad6499937c")
 
-    // ---- Register IDs -----------------------------------------------------------------------
+    /**
+     * Control characteristic (Write + Notify).
+     * Carries: PIN auth, opcodes (keepalive, readyToReceive, error), short responses.
+     */
+    public val CONTROL_UUID: UUID =
+        UUID.fromString("68c10002-b17f-4d3a-a290-34ad6499937c")
+
+    /**
+     * Data characteristic (Notify).
+     * Carries: CBOR-chunked path values (path lists, get/set responses).
+     */
+    public val DATA_UUID: UUID =
+        UUID.fromString("68c10003-b17f-4d3a-a290-34ad6499937c")
+
+    // ---- VE.Direct Register IDs (for documentation / serial fallback) ------------------------
 
     /** Load output control mode (read/write, un8). */
     public const val LOAD_OUTPUT_CONTROL: Int = 0xEDAB
@@ -62,111 +55,38 @@ public object VictronRegisters {
     /** Load switch low-level voltage threshold (read/write, un16, 0.01 V scale). */
     public const val LOAD_SWITCH_LOW: Int = 0xED9C
 
-    // ---- Load output control values ---------------------------------------------------------
+    /** Device capabilities register (read, firmware >= 1.16). */
+    public const val CAPABILITIES: Int = 0x0140
 
-    /** Load output always off. */
-    public const val LOAD_OFF: Int = 0
+    // ---- Load output control values (path `/Settings/Load/OperationMode`) -------------------
 
-    /** Automatic (BatteryLife algorithm). */
+    /** Automatic — BatteryLife algorithm, load follows voltage thresholds. */
     public const val LOAD_AUTO: Int = 1
 
-    /** Load output always on. */
-    public const val LOAD_ALWAYS_ON: Int = 5
+    /** Always on — load output permanently enabled. */
+    public const val LOAD_ALWAYS_ON: Int = 4
 
-    /** Load output always off (explicit). */
-    public const val LOAD_ALWAYS_OFF: Int = 4
+    // ---- Capability bits (from register 0x0140) ---------------------------------------------
 
-    // ---- VREG/CBOR wire framing -------------------------------------------------------------
+    /** Device has a physical load output. */
+    public const val CAP_HAS_LOAD: Int = 0x0001
 
-    /**
-     * Encodes a register write command in the VREG framing used over the BLE transport
-     * characteristic.
-     *
-     * Wire format: `08 00 19 <register-LE-u16> <CBOR-encoded-value>`
-     *
-     * The value is CBOR-encoded as a byte string (major type 2) containing the raw bytes.
-     * For a single u8 value this is `42 XX 00` (2-byte bstr, value, padding to u16 width).
-     */
-    public fun encodeWrite(register: Int, value: ByteArray): ByteArray {
-        val regLo = register and 0xFF
-        val regHi = (register shr 8) and 0xFF
-        // CBOR major type 2 (byte string), length = value.size
-        val cborHeader = if (value.size < 24) {
-            byteArrayOf((0x40 or value.size).toByte())
-        } else {
-            // length 24..255: one-byte length follows
-            byteArrayOf(0x58, value.size.toByte())
-        }
-        return byteArrayOf(0x08, 0x00, 0x19, regLo.toByte(), regHi.toByte()) +
-            cborHeader + value
-    }
+    /** Device has user-configurable load switch voltage levels. */
+    public const val CAP_HAS_USER_LOAD_SWITCH: Int = 0x0800
 
-    /** Convenience: encode a single-byte register write (most control registers are un8). */
-    public fun encodeWriteU8(register: Int, value: Int): ByteArray =
-        encodeWrite(register, byteArrayOf(value.toByte()))
+    // ---- VeSmartService path constants ------------------------------------------------------
 
-    /** Convenience: encode a two-byte little-endian register write. */
-    public fun encodeWriteU16(register: Int, value: Int): ByteArray =
-        encodeWrite(register, byteArrayOf((value and 0xFF).toByte(), ((value shr 8) and 0xFF).toByte()))
+    /** Path for load output operation mode (values: 1=auto, 4=always on). */
+    public const val PATH_LOAD_OPERATION_MODE: String = "/Settings/Load/OperationMode"
 
-    /**
-     * Encodes a register read request.
-     *
-     * Wire format: `08 00 17 <register-LE-u16>`
-     */
-    public fun encodeRead(register: Int): ByteArray {
-        val regLo = register and 0xFF
-        val regHi = (register shr 8) and 0xFF
-        return byteArrayOf(0x08, 0x00, 0x17, regLo.toByte(), regHi.toByte())
-    }
+    /** Path for charger mode (values: 1=on, 4=off, 0xFD=hibernate). */
+    public const val PATH_MODE: String = "/Mode"
 
-    /**
-     * Attempts to decode a register response frame.
-     *
-     * Expected format: `08 00 19 <register-LE-u16> <CBOR-bstr-payload>`
-     *
-     * @return the register ID and raw value bytes, or `null` if the frame is not a valid response.
-     */
-    public fun decodeResponse(frame: ByteArray): RegisterValue? {
-        if (frame.size < 6) return null
-        if (frame[0] != 0x08.toByte() || frame[1] != 0x00.toByte() || frame[2] != 0x19.toByte()) return null
-        val register = (frame[3].toInt() and 0xFF) or ((frame[4].toInt() and 0xFF) shl 8)
-        // CBOR byte string decode
-        val cborStart = 5
-        if (cborStart >= frame.size) return null
-        val majorByte = frame[cborStart].toInt() and 0xFF
-        if ((majorByte and 0xE0) != 0x40) return null // not a byte string
-        val length: Int
-        val dataStart: Int
-        val additional = majorByte and 0x1F
-        if (additional < 24) {
-            length = additional
-            dataStart = cborStart + 1
-        } else if (additional == 24 && cborStart + 1 < frame.size) {
-            length = frame[cborStart + 1].toInt() and 0xFF
-            dataStart = cborStart + 2
-        } else {
-            return null
-        }
-        if (dataStart + length > frame.size) return null
-        return RegisterValue(register, frame.copyOfRange(dataStart, dataStart + length))
-    }
+    /** Path for load output state (read-only, 0=off, 1=on). */
+    public const val PATH_LOAD_STATE: String = "/Load/State"
 
-    /** A decoded register ID + raw value from a GATT response frame. */
-    public data class RegisterValue(val register: Int, val value: ByteArray) {
-        /** Reads value as unsigned 8-bit. */
-        public fun asU8(): Int = if (value.isNotEmpty()) value[0].toInt() and 0xFF else 0
+    // ---- Product IDs with load output -------------------------------------------------------
 
-        /** Reads value as unsigned 16-bit little-endian. */
-        public fun asU16(): Int = if (value.size >= 2) {
-            (value[0].toInt() and 0xFF) or ((value[1].toInt() and 0xFF) shl 8)
-        } else {
-            asU8()
-        }
-
-        override fun equals(other: Any?): Boolean =
-            other is RegisterValue && register == other.register && value.contentEquals(other.value)
-
-        override fun hashCode(): Int = 31 * register + value.contentHashCode()
-    }
+    /** SmartSolar MPPT 100/20-48V. */
+    public const val PRODUCT_SMARTSOLAR_100_20_48V: Int = 0xA05F
 }

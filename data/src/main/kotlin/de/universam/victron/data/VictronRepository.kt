@@ -239,28 +239,22 @@ public class VictronRepository internal constructor(
     private val gatt by lazy { VictronGatt(context) }
 
     /**
-     * Toggles the load output via a short-lived GATT connection.
+     * Toggles the load output via the VeSmartService path-based protocol.
      *
-     * @return `true` if the read-back state matches [enabled], `false` on any failure.
+     * @return `true` if the device acknowledged the change, `false` on any failure.
      */
     public suspend fun setLoadOutput(address: String, enabled: Boolean): Boolean {
         val pin = configStore.data.first().blePinFor(address)
-        val value = if (enabled) VictronRegisters.LOAD_ALWAYS_ON else VictronRegisters.LOAD_ALWAYS_OFF
-        val result = gatt.writeU8AndReadBack(
-            address = address,
-            register = VictronRegisters.LOAD_OUTPUT_CONTROL,
-            value = value,
-            pin = pin,
-        )
-        val state = result?.asU8()
-        Log.d(TAG, "setLoadOutput($address, $enabled) → state=$state")
-        return state == (if (enabled) 1 else 0)
+        val value = if (enabled) VictronRegisters.LOAD_ALWAYS_ON else VictronRegisters.LOAD_AUTO
+        val success = gatt.setLoadOutputMode(address = address, value = value, pin = pin)
+        Log.d(TAG, "setLoadOutput($address, $enabled) → $success")
+        return success
     }
 
-    /** Reads the current load output state (true=on, false=off, null=unknown). */
+    /** Reads the current load output mode (4=always on, 1=auto, null=unknown). */
     public suspend fun getLoadOutputState(address: String): Boolean? {
         val pin = configStore.data.first().blePinFor(address)
-        val result = gatt.readRegister(address, VictronRegisters.LOAD_OUTPUT_STATE, pin = pin)
-        return result?.asU8()?.let { it == 1 }
+        val mode = gatt.getLoadOutputMode(address, pin = pin)
+        return mode?.let { it == VictronRegisters.LOAD_ALWAYS_ON }
     }
 }
