@@ -90,6 +90,8 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   dimmed rather than hidden.
 - **Only `BLUETOOTH_SCAN` (with `neverForLocation`).** No `BLUETOOTH_CONNECT`, no location, no
   foreground service — we never connect, and expedited work covers background scans.
+  **Exception:** the mobile app adds `BLUETOOTH_CONNECT` for the load output toggle (short-lived
+  GATT connection via `VictronGatt`). The wear app does **not** have this permission.
 - **Unknown record types must survive**: decrypt, keep the payload hex, show it on the Raw data
   screen. Don't throw it away and don't guess a layout.
 - Keys are matched by address first, then by the plaintext key-check byte (first key byte). Keep the

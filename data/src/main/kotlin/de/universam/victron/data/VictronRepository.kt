@@ -15,6 +15,7 @@ import de.universam.victron.protocol.VictronAdvertisement
 import de.universam.victron.protocol.VictronCipher
 import de.universam.victron.protocol.VictronDecoder
 import de.universam.victron.protocol.VictronHeader
+import de.universam.victron.protocol.VictronRegisters
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -231,5 +232,32 @@ public class VictronRepository internal constructor(
 
     internal companion object {
         private const val TAG = "VictronRepository"
+    }
+
+    // ---- load output control (GATT, mobile only) --------------------------------------------
+
+    private val gatt by lazy { VictronGatt(context) }
+
+    /**
+     * Toggles the load output via a short-lived GATT connection.
+     *
+     * @return `true` if the read-back state matches [enabled], `false` on any failure.
+     */
+    public suspend fun setLoadOutput(address: String, enabled: Boolean): Boolean {
+        val value = if (enabled) VictronRegisters.LOAD_ALWAYS_ON else VictronRegisters.LOAD_ALWAYS_OFF
+        val result = gatt.writeU8AndReadBack(
+            address = address,
+            register = VictronRegisters.LOAD_OUTPUT_CONTROL,
+            value = value,
+        )
+        val state = result?.asU8()
+        Log.d(TAG, "setLoadOutput($address, $enabled) → state=$state")
+        return state == (if (enabled) 1 else 0)
+    }
+
+    /** Reads the current load output state (true=on, false=off, null=unknown). */
+    public suspend fun getLoadOutputState(address: String): Boolean? {
+        val result = gatt.readRegister(address, VictronRegisters.LOAD_OUTPUT_STATE)
+        return result?.asU8()?.let { it == 1 }
     }
 }

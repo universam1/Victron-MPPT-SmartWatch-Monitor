@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import de.universam.victron.data.VictronPalette
+import de.universam.victron.data.LoadOutputResult
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.ReadingHistory
@@ -45,6 +46,8 @@ fun DashboardScreen(
     now: Long,
     history: Map<String, ReadingHistory>,
     onOpenSetup: () -> Unit,
+    loadOutputResult: LoadOutputResult = LoadOutputResult.Idle,
+    onToggleLoadOutput: ((String, Boolean) -> Unit)? = null,
 ) {
     val decoded = snapshots.filter { it.status == SnapshotStatus.DECODED }
     val bgBrush = Brush.verticalGradient(listOf(BG_TOP, BG_BOTTOM))
@@ -82,6 +85,14 @@ fun DashboardScreen(
                         // Always-available way into setup, so navigation never depends on finding a
                         // device first.
                         onOpenSetup = onOpenSetup,
+                        loadOutputOn = when (loadOutputResult) {
+                            is LoadOutputResult.Done -> loadOutputResult.isOn
+                            else -> snapshot?.solarCharger?.loadCurrent?.let { true }
+                        },
+                        loadOutputSending = loadOutputResult is LoadOutputResult.Sending,
+                        onToggleLoadOutput = snapshot?.let { s ->
+                            onToggleLoadOutput?.let { cb -> { enabled: Boolean -> cb(s.address, enabled) } }
+                        },
                     )
                 } else {
                     // Empty placeholder — LaunchedEffect navigates away immediately

@@ -19,12 +19,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -79,6 +82,9 @@ fun DeviceDashboard(
     modifier: Modifier = Modifier,
     history: ReadingHistory? = null,
     onOpenSetup: (() -> Unit)? = null,
+    loadOutputOn: Boolean? = null,
+    loadOutputSending: Boolean = false,
+    onToggleLoadOutput: ((Boolean) -> Unit)? = null,
 ) {
     val values = snapshot?.solarCharger
     val stale = snapshot != null && Formatting.isStale(snapshot, now)
@@ -144,6 +150,14 @@ fun DeviceDashboard(
                             stale = stale,
                             compact = true,
                         )
+                        if (onToggleLoadOutput != null) {
+                            LoadOutputToggle(
+                                isOn = loadOutputOn,
+                                sending = loadOutputSending,
+                                stale = stale,
+                                onToggle = onToggleLoadOutput,
+                            )
+                        }
                     }
                 }
             } else {
@@ -171,6 +185,15 @@ fun DeviceDashboard(
                     )
 
                     ValueTiles(values = values, history = history, stale = stale)
+
+                    if (onToggleLoadOutput != null) {
+                        LoadOutputToggle(
+                            isOn = loadOutputOn,
+                            sending = loadOutputSending,
+                            stale = stale,
+                            onToggle = onToggleLoadOutput,
+                        )
+                    }
                 }
             }
         }
@@ -319,5 +342,52 @@ private fun ValueTiles(
         } else {
             Box(modifier = Modifier.weight(1f))
         }
+    }
+}
+
+/** Row with a label and switch for toggling the MPPT load output on/off. */
+@Composable
+private fun LoadOutputToggle(
+    isOn: Boolean?,
+    sending: Boolean,
+    stale: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val accentColor = if (stale) TEXT_DIM else BATTERY
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Brush.verticalGradient(listOf(SURFACE_LIGHT, SURFACE)))
+            .background(accentColor.copy(alpha = 0.08f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isOn == true) Icons.Filled.Power else Icons.Filled.PowerOff,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp).padding(end = 4.dp),
+                tint = if (stale) TEXT_DIM else if (isOn == true) CHARGING else TEXT_DIM,
+            )
+            Text(
+                text = stringResource(R.string.label_load_output),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = TEXT_PRIMARY,
+            )
+        }
+        Switch(
+            checked = isOn ?: false,
+            onCheckedChange = { onToggle(it) },
+            enabled = !sending && !stale,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = CHARGING,
+                checkedTrackColor = CHARGING.copy(alpha = 0.3f),
+                uncheckedThumbColor = TEXT_DIM,
+                uncheckedTrackColor = TRACK,
+            ),
+        )
     }
 }

@@ -37,6 +37,14 @@ public sealed interface SyncResult {
     public data class Failed(val message: String) : SyncResult
 }
 
+/** Result of a load output toggle operation. */
+public sealed interface LoadOutputResult {
+    public data object Idle : LoadOutputResult
+    public data object Sending : LoadOutputResult
+    public data class Done(val isOn: Boolean) : LoadOutputResult
+    public data class Failed(val message: String) : LoadOutputResult
+}
+
 /**
  * Shared between the watch app and the phone app — both show the same data and offer the same
  * actions, so there is exactly one place where scanning and configuration live.
@@ -223,5 +231,31 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
 
         /** 2 Hz — fast enough to look live for a value that updates about once a second. */
         private const val UI_UPDATE_WINDOW_MILLIS = 500L
+    }
+
+    // ---- load output control (mobile only) --------------------------------------------------
+
+    private val _loadOutputResult = MutableStateFlow<LoadOutputResult>(LoadOutputResult.Idle)
+    public val loadOutputResult: StateFlow<LoadOutputResult> = _loadOutputResult.asStateFlow()
+
+    /** Toggles load output on the device at [address]. */
+    public fun toggleLoadOutput(address: String, enable: Boolean) {
+        viewModelScope.launch {
+            _loadOutputResult.value = LoadOutputResult.Sending
+            try {
+                val success = repository.setLoadOutput(address, enable)
+                _loadOutputResult.value = if (success) {
+                    LoadOutputResult.Done(isOn = enable)
+                } else {
+                    LoadOutputResult.Failed("Device did not confirm state change")
+                }
+            } catch (e: SecurityException) {
+                _loadOutputResult.value = LoadOutputResult.Failed("BLUETOOTH_CONNECT permission denied")
+            } catch (e: Exception) {
+                _loadOutputResult.value = LoadOutputResult.Failed(e.message ?: "Connection failed")
+            }
+            delay(3_000)
+            _loadOutputResult.value = LoadOutputResult.Idle
+        }
     }
 }

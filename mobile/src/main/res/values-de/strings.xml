@@ -43,6 +43,8 @@
     <string name="label_state">Zustand</string>
     <string name="label_error">Fehler</string>
     <string name="label_load">Last</string>
+    <string name="label_load_output">Lastausgang</string>
+    <string name="load_output_failed">Lastausgang-Umschaltung fehlgeschlagen: %1$s</string>
     <string name="label_age">Alter</string>
     <string name="label_signal">Signal</string>
     <string name="label_payload">Entschlüsselte Nutzdaten</string>

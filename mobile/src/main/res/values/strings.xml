@@ -43,6 +43,8 @@
     <string name="label_state">State</string>
     <string name="label_error">Error</string>
     <string name="label_load">Load</string>
+    <string name="label_load_output">Load Output</string>
+    <string name="load_output_failed">Load output toggle failed: %1$s</string>
     <string name="label_age">Age</string>
     <string name="label_signal">Signal</string>
     <string name="label_payload">Decrypted payload</string>

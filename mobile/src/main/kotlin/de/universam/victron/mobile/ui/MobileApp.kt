@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.universam.victron.data.Formatting
+import de.universam.victron.data.LoadOutputResult
 import de.universam.victron.data.ScanState
 import de.universam.victron.data.ScanUnavailable
 import de.universam.victron.data.SyncResult
@@ -76,6 +77,7 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
     val config by viewModel.config.collectAsStateWithLifecycle()
     val scanState by viewModel.scanState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val loadOutputResult by viewModel.loadOutputResult.collectAsStateWithLifecycle()
 
     DisposableEffect(Unit) {
         viewModel.startLiveScan()
@@ -115,6 +117,10 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
                 now = now,
                 history = history,
                 onOpenSetup = { screen = Screen.Setup },
+                loadOutputResult = loadOutputResult,
+                onToggleLoadOutput = { address, enabled ->
+                    viewModel.toggleLoadOutput(address, enabled)
+                },
             )
 
             Screen.Setup -> SetupContent(
