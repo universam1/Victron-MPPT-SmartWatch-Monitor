@@ -22,6 +22,13 @@ android {
     defaultConfig {
         // Same id as the watch app on purpose — see wear/build.gradle.kts.
         applicationId = "de.universam.victron"
+        // Suffix for side-by-side installation with the release build.
+        if (project.hasProperty("devSuffix")) {
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "Victron DEV"
+        } else {
+            manifestPlaceholders["appLabel"] = "@string/app_name"
+        }
         minSdk = libs.versions.minSdkMobile.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = (System.getenv("VICTRON_VERSION_CODE") ?: "1").toInt()
