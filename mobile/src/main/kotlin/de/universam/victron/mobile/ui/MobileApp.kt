@@ -59,6 +59,9 @@ import de.universam.victron.mobile.ui.dashboard.DashboardScreen
 import kotlinx.coroutines.delay
 
 private const val BLUETOOTH_SCAN = android.Manifest.permission.BLUETOOTH_SCAN
+private const val BLUETOOTH_CONNECT = android.Manifest.permission.BLUETOOTH_CONNECT
+
+private val REQUIRED_PERMISSIONS = arrayOf(BLUETOOTH_SCAN, BLUETOOTH_CONNECT)
 
 /** Widest the setup form gets — beyond this a text field is just a long line to read. */
 private val MAX_FORM_WIDTH = 560.dp
@@ -78,6 +81,21 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
     val scanState by viewModel.scanState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val loadOutputResult by viewModel.loadOutputResult.collectAsStateWithLifecycle()
+
+    // Request all missing permissions up front so scanning and GATT work without friction.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results -> if (results.values.any { it }) viewModel.retryScan() }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val missing = REQUIRED_PERMISSIONS.filter {
+            context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) {
+            permissionLauncher.launch(missing.toTypedArray())
+        }
+    }
 
     DisposableEffect(Unit) {
         viewModel.startLiveScan()
@@ -147,8 +165,8 @@ private fun SetupContent(
     onOpenDashboard: () -> Unit,
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) viewModel.retryScan() }
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results -> if (results.values.any { it }) viewModel.retryScan() }
 
     // A form stretched across a landscape phone is unreadable, so the content keeps a sane
     // measure and centres in whatever width is left.
@@ -202,7 +220,7 @@ private fun SetupContent(
                                 },
                             )
                             if (unavailable.reason == ScanUnavailable.NoPermission) {
-                                Button(onClick = { permissionLauncher.launch(BLUETOOTH_SCAN) }) {
+                                Button(onClick = { permissionLauncher.launch(REQUIRED_PERMISSIONS) }) {
                                     Text(stringResource(R.string.permission_grant))
                                 }
                             }

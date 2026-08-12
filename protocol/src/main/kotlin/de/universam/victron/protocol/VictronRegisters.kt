@@ -41,6 +41,37 @@ public object VictronRegisters {
     public val DATA_UUID: UUID =
         UUID.fromString("68c10003-b17f-4d3a-a290-34ad6499937c")
 
+    // ---- VeSmartService GATT UUIDs (306b — requires encrypted link) -------------------------
+
+    /**
+     * The VeSmartService for settings read/write (path-based CBOR protocol).
+     * Requires BLE bonding (encrypted link). Not visible until pairing is complete.
+     */
+    public val SMART_SERVICE_UUID: UUID =
+        UUID.fromString("306b0001-b081-4037-83dc-e59fcc3cdfd0")
+
+    /**
+     * VeSmartService RX characteristic (Read + WriteWithoutResponse + Notify).
+     * Receives keepalive/ack notifications (f901).
+     */
+    public val SMART_RX_UUID: UUID =
+        UUID.fromString("306b0002-b081-4037-83dc-e59fcc3cdfd0")
+
+    /**
+     * VeSmartService TX characteristic (WriteWithoutResponse + Notify).
+     * Carries protocol commands (init, GetDevices, GetPathList, GetPathValue, SetPathValue)
+     * and their responses as notifications.
+     */
+    public val SMART_TX_UUID: UUID =
+        UUID.fromString("306b0003-b081-4037-83dc-e59fcc3cdfd0")
+
+    /**
+     * VeSmartService bulk characteristic (WriteWithoutResponse + Notify).
+     * Carries bulk path queries (batched GetPathValue requests).
+     */
+    public val SMART_BULK_UUID: UUID =
+        UUID.fromString("306b0004-b081-4037-83dc-e59fcc3cdfd0")
+
     // ---- VE.Direct Register IDs (for documentation / serial fallback) ------------------------
 
     /** Load output control mode (read/write, un8). */

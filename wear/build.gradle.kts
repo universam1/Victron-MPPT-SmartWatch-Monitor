@@ -24,6 +24,13 @@ android {
         // Both apps must share this id (and be signed with the same key) or the Wear OS Data
         // Layer keeps them in separate namespaces and the key sync silently does nothing.
         applicationId = "de.universam.victron"
+        // Suffix for side-by-side installation with the release build.
+        if (project.hasProperty("devSuffix")) {
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "Victron DEV"
+        } else {
+            manifestPlaceholders["appLabel"] = "@string/app_name"
+        }
         minSdk = libs.versions.minSdkWear.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         // Overridden by the release workflow, which derives both from the git tag.
@@ -43,6 +50,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

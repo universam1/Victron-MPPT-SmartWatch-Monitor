@@ -49,19 +49,42 @@ public class VictronGatt(context: Context) {
         timeoutMs: Long = TIMEOUT_MS,
     ): Boolean = withGatt(address, pin, timeoutMs) { session ->
         // Step 1: ReadyToReceive — tell device we can accept responses
-        session.writeControl(VeSmartProtocol.encodeReadyToReceive()) ?: return@withGatt false
+        Log.d(TAG, "Step 1: sending ReadyToReceive")
+        session.writeControl(VeSmartProtocol.encodeReadyToReceive()) ?: run {
+            Log.w(TAG, "Step 1 failed: writeControl(ReadyToReceive) returned null")
+            return@withGatt false
+        }
         delay(100)
 
         // Step 2: GetDevices — discover device instances
-        session.writeControl(VeSmartProtocol.encodeGetDevices()) ?: return@withGatt false
-        val devicesResponse = session.awaitDataNotification() ?: return@withGatt false
+        Log.d(TAG, "Step 2: sending GetDevices")
+        session.writeControl(VeSmartProtocol.encodeGetDevices()) ?: run {
+            Log.w(TAG, "Step 2 failed: writeControl(GetDevices) returned null")
+            return@withGatt false
+        }
+        Log.d(TAG, "Step 2: awaiting data notification")
+        val devicesResponse = session.awaitDataNotification() ?: run {
+            Log.w(TAG, "Step 2 failed: awaitDataNotification (GetDevices) timed out")
+            return@withGatt false
+        }
+        Log.d(TAG, "Step 2: got devices response: ${devicesResponse.toHex()}")
         // For single-device setups, instanceId is typically 0
         val instanceId = 0
 
         // Step 3: GetPathList — get path→index mapping
-        session.writeControl(VeSmartProtocol.encodeGetPathList(instanceId)) ?: return@withGatt false
-        val pathListResponse = session.awaitDataNotification() ?: return@withGatt false
+        Log.d(TAG, "Step 3: sending GetPathList(instance=$instanceId)")
+        session.writeControl(VeSmartProtocol.encodeGetPathList(instanceId)) ?: run {
+            Log.w(TAG, "Step 3 failed: writeControl(GetPathList) returned null")
+            return@withGatt false
+        }
+        Log.d(TAG, "Step 3: awaiting data notification")
+        val pathListResponse = session.awaitDataNotification() ?: run {
+            Log.w(TAG, "Step 3 failed: awaitDataNotification (GetPathList) timed out")
+            return@withGatt false
+        }
+        Log.d(TAG, "Step 3: got path list response: ${pathListResponse.toHex()}")
         val paths = VeSmartProtocol.parsePathList(pathListResponse)
+        Log.d(TAG, "Step 3: parsed paths = $paths")
 
         val loadPathIndex = paths[VictronRegisters.PATH_LOAD_OPERATION_MODE]
         if (loadPathIndex == null) {
@@ -70,14 +93,20 @@ public class VictronGatt(context: Context) {
         }
 
         // Step 4: SetPathValue — write the load output mode
+        Log.d(TAG, "Step 4: SetPathValue(instance=$instanceId, pathIndex=$loadPathIndex, value=$value)")
         val setMsg = VeSmartProtocol.encodeSetPathValue(instanceId, loadPathIndex, value)
-        session.writeData(setMsg) ?: return@withGatt false
+        session.writeData(setMsg) ?: run {
+            Log.w(TAG, "Step 4 failed: writeData(SetPathValue) returned null")
+            return@withGatt false
+        }
 
         // Step 5: Await acknowledgement
+        Log.d(TAG, "Step 5: awaiting control notification (ack)")
         val ackResponse = session.awaitControlNotification()
         val success = ackResponse != null &&
             ackResponse.isNotEmpty() &&
             (ackResponse[0].toInt() and 0xFF) == VeSmartProtocol.OP_PATH_RESPONSE
+        Log.d(TAG, "Step 5: ack=${ackResponse?.toHex()}, success=$success")
 
         Log.d(TAG, "setLoadOutputMode($address, $value) → success=$success")
         success
@@ -123,8 +152,11 @@ public class VictronGatt(context: Context) {
         block: suspend (GattSession) -> T,
     ): T? {
         val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter
-            ?: return null
-        val device: BluetoothDevice = adapter.getRemoteDevice(address) ?: return null
+            ?: run { Log.w(TAG, "BluetoothManager or adapter is null"); return null }
+        val device: BluetoothDevice = adapter.getRemoteDevice(address)
+            ?: run { Log.w(TAG, "getRemoteDevice($address) returned null"); return null }
+
+        Log.d(TAG, "withGatt: address=$address, bondState=${device.bondState}, pin=$pin")
 
         // Set PIN for auto-pairing if not yet bonded.
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
@@ -133,14 +165,20 @@ public class VictronGatt(context: Context) {
 
         val session = GattSession()
         val gatt = device.connectGatt(appContext, false, session.callback, BluetoothDevice.TRANSPORT_LE)
-            ?: return null
+            ?: run { Log.w(TAG, "connectGatt returned null"); return null }
         session.gatt = gatt
 
         return try {
             withTimeout(timeoutMs) {
-                if (!session.awaitConnected()) return@withTimeout null
-                if (!session.awaitServiceDiscovery()) return@withTimeout null
-                session.enableNotifications() ?: return@withTimeout null
+                Log.d(TAG, "withGatt: awaiting connection…")
+                if (!session.awaitConnected()) { Log.w(TAG, "withGatt: connection failed"); return@withTimeout null }
+                Log.d(TAG, "withGatt: connected, discovering services…")
+                if (!session.awaitServiceDiscovery()) { Log.w(TAG, "withGatt: service discovery failed"); return@withTimeout null }
+                Log.d(TAG, "withGatt: services discovered, enabling notifications…")
+                session.enableNotifications() ?: run { Log.w(TAG, "withGatt: enableNotifications failed"); return@withTimeout null }
+                Log.d(TAG, "withGatt: notifications enabled, initializing session…")
+                if (!session.authenticatePin(pin)) { Log.w(TAG, "withGatt: session init failed"); return@withTimeout null }
+                Log.d(TAG, "withGatt: session ready, running block")
                 delay(200) // allow notifications to stabilize
 
                 block(session)
@@ -209,9 +247,15 @@ public class VictronGatt(context: Context) {
                 characteristic: BluetoothGattCharacteristic,
             ) {
                 val data = characteristic.value ?: return
-                when (characteristic.uuid) {
-                    VictronRegisters.CONTROL_UUID -> controlNotifyDeferred?.complete(data)
-                    VictronRegisters.DATA_UUID -> dataNotifyDeferred?.complete(data)
+                Log.d(TAG, "onNotify ${characteristic.uuid.toString().substring(4,8)}: ${data.toHex()}")
+                // All VeSmartService notifications arrive on 306b chars.
+                // Route to whichever deferred is currently waiting — data takes priority since
+                // it's the protocol response we're actively waiting for.
+                val dataDeferred = dataNotifyDeferred
+                if (dataDeferred != null && !dataDeferred.isCompleted) {
+                    dataDeferred.complete(data)
+                } else {
+                    controlNotifyDeferred?.complete(data)
                 }
             }
         }
@@ -224,50 +268,113 @@ public class VictronGatt(context: Context) {
             return servicesDeferred.await()
         }
 
+        /**
+         * Initialize the VeSmartService session.
+         * From HCI trace: write fa80ff (disconnect old session) then f980 (ready) to
+         * the VeSmartService RX char (306b0002), device responds with f901 (session ready).
+         * This must happen AFTER enabling notifications on 306b chars.
+         */
+        @SuppressLint("MissingPermission")
+        suspend fun authenticatePin(pin: String): Boolean {
+            val smartService = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: run {
+                Log.w(TAG, "VeSmartService not found for session init")
+                return false
+            }
+            val rxChar = smartService.getCharacteristic(VictronRegisters.SMART_RX_UUID) ?: run {
+                Log.w(TAG, "Smart RX char ${VictronRegisters.SMART_RX_UUID} not found")
+                return false
+            }
+
+            // Send session disconnect/reset: fa 80 ff
+            writeCharDirect(rxChar, byteArrayOf(0xfa.toByte(), 0x80.toByte(), 0xff.toByte()))
+            delay(100)
+
+            // Send ready: f9 80
+            writeCharDirect(rxChar, byteArrayOf(0xf9.toByte(), 0x80.toByte()))
+            delay(300)
+
+            // Wait for f9 01 response (session ready)
+            val response = awaitDataNotification(waitMs = 3000)
+            if (response != null && response.size >= 2 && response[0] == 0xf9.toByte() && response[1] == 0x01.toByte()) {
+                Log.d(TAG, "Session initialized (f901)")
+                return true
+            }
+            Log.w(TAG, "Session init response: ${response?.joinToString("") { "%02x".format(it) } ?: "null"}")
+            return true // proceed anyway — the device might have already responded
+        }
+
+        @SuppressLint("MissingPermission")
+        private fun writeCharDirect(char: BluetoothGattCharacteristic, value: ByteArray) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                gatt.writeCharacteristic(char, value, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+            } else {
+                @Suppress("DEPRECATION")
+                char.value = value
+                char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(char)
+            }
+        }
+
         /** Enable notifications on both control and data characteristics. */
         @SuppressLint("MissingPermission")
         suspend fun enableNotifications(): Boolean? {
-            val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: run {
-                Log.w(TAG, "Service 68c10001 not found")
+            val service = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: run {
+                Log.w(TAG, "VeSmartService ${VictronRegisters.SMART_SERVICE_UUID} not found")
+                Log.d(TAG, "Available services: ${gatt.services.map { it.uuid }}")
                 return null
             }
+            Log.d(TAG, "Service found, characteristics: ${service.characteristics.map { "${it.uuid} props=0x${it.properties.toString(16)}" }}")
 
-            // Enable on control char (68c10002)
-            val controlChar = service.getCharacteristic(VictronRegisters.CONTROL_UUID) ?: return null
-            gatt.setCharacteristicNotification(controlChar, true)
-            val controlCccd = controlChar.getDescriptor(CCCD_UUID) ?: return null
-            descriptorDeferred = CompletableDeferred()
-            @Suppress("DEPRECATION")
-            controlCccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            @Suppress("DEPRECATION")
-            gatt.writeDescriptor(controlCccd)
-            if (descriptorDeferred?.await() != true) return null
-
-            // Enable on data char (68c10003)
-            val dataChar = service.getCharacteristic(VictronRegisters.DATA_UUID) ?: return null
-            gatt.setCharacteristicNotification(dataChar, true)
-            val dataCccd = dataChar.getDescriptor(CCCD_UUID) ?: return null
-            descriptorDeferred = CompletableDeferred()
-            @Suppress("DEPRECATION")
-            dataCccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            @Suppress("DEPRECATION")
-            gatt.writeDescriptor(dataCccd)
-            return descriptorDeferred?.await()
+            // Enable notifications on all characteristics that support it.
+            // The device exposes 68c10002 (Write+Notify) and 68c10003 (WriteWithoutResponse only).
+            // Only 68c10002 has a CCCD descriptor; 68c10003 is write-only for outgoing data.
+            // Responses arrive as notifications on 68c10002.
+            for (char in service.characteristics) {
+                if (char.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
+                    if (!enableNotify(char, char.uuid.toString().substring(4, 8))) return null
+                }
+            }
+            return true
         }
 
-        /** Write to the control characteristic (68c10002). */
+        @SuppressLint("MissingPermission")
+        private suspend fun enableNotify(
+            characteristic: BluetoothGattCharacteristic,
+            label: String,
+        ): Boolean {
+            gatt.setCharacteristicNotification(characteristic, true)
+            val cccd = characteristic.getDescriptor(CCCD_UUID) ?: run {
+                Log.w(TAG, "CCCD descriptor not found on $label (${characteristic.uuid})")
+                return false
+            }
+            descriptorDeferred = CompletableDeferred()
+            @Suppress("DEPRECATION")
+            cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            @Suppress("DEPRECATION")
+            val initiated = gatt.writeDescriptor(cccd)
+            if (!initiated) {
+                Log.w(TAG, "writeDescriptor($label) returned false — GATT busy or not connected")
+                return false
+            }
+            val result = descriptorDeferred?.await() == true
+            if (!result) Log.w(TAG, "writeDescriptor($label) callback reported failure")
+            return result
+        }
+
+        /** Write to the VeSmartService TX characteristic (306b0003). */
         @SuppressLint("MissingPermission")
         suspend fun writeControl(payload: ByteArray): Boolean? {
-            val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: return null
-            val char = service.getCharacteristic(VictronRegisters.CONTROL_UUID) ?: return null
+            val service = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: return null
+            val char = service.getCharacteristic(VictronRegisters.SMART_TX_UUID) ?: return null
             return writeChar(char, payload)
         }
 
-        /** Write to the data characteristic (68c10003). */
+        /** Write to the VeSmartService TX characteristic (306b0003) — same as control for this protocol. */
         @SuppressLint("MissingPermission")
         suspend fun writeData(payload: ByteArray): Boolean? {
-            val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: return null
-            val char = service.getCharacteristic(VictronRegisters.DATA_UUID) ?: return null
+            val service = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: return null
+            val char = service.getCharacteristic(VictronRegisters.SMART_TX_UUID) ?: return null
             return writeChar(char, payload)
         }
 
@@ -296,22 +403,31 @@ public class VictronGatt(context: Context) {
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
         ): Boolean? {
-            writeDeferred = CompletableDeferred()
+            // VictronConnect uses WriteWithoutResponse (WriteCmd) for all protocol data.
+            // This is fire-and-forget: no onCharacteristicWrite callback.
             if (Build.VERSION.SDK_INT >= 33) {
                 val result = gatt.writeCharacteristic(
                     characteristic,
                     value,
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT,
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
                 )
-                if (result != BluetoothGatt.GATT_SUCCESS) return false
+                if (result != BluetoothGatt.GATT_SUCCESS) {
+                    Log.w(TAG, "writeCharacteristic failed: result=$result")
+                    return false
+                }
             } else {
                 @Suppress("DEPRECATION")
                 characteristic.value = value
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                 @Suppress("DEPRECATION")
-                if (!gatt.writeCharacteristic(characteristic)) return false
+                if (!gatt.writeCharacteristic(characteristic)) {
+                    Log.w(TAG, "writeCharacteristic returned false")
+                    return false
+                }
             }
-            return writeDeferred?.await()
+            // Small delay to let the BLE stack flush — no callback for WriteWithoutResponse.
+            delay(50)
+            return true
         }
     }
 
@@ -319,5 +435,6 @@ public class VictronGatt(context: Context) {
         private const val TAG = "VictronGatt"
         private const val TIMEOUT_MS = 20_000L
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
     }
 }

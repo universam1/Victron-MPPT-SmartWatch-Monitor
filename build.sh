@@ -57,15 +57,15 @@ case "${1:-apk}" in
         run_gradle :protocol:test
         ;;
     apk)
-        run_gradle :wear:assembleDebug :mobile:assembleDebug
+        run_gradle -PdevSuffix :wear:assembleDebug :mobile:assembleDebug
         echo "APKs:"; apk_paths
         ;;
     apk-wear)
-        run_gradle :wear:assembleDebug
+        run_gradle -PdevSuffix :wear:assembleDebug
         echo "APKs:"; apk_paths
         ;;
     apk-mobile)
-        run_gradle :mobile:assembleDebug
+        run_gradle -PdevSuffix :mobile:assembleDebug
         echo "APKs:"; apk_paths
         ;;
     apk-release)
