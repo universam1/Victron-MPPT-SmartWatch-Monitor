@@ -66,14 +66,18 @@ class VictronRegistersTest {
     }
 
     @Test
-    fun `registerUuid builds expected UUID string`() {
-        val uuid = VictronRegisters.registerUuid(0xEDAB)
-        assertEquals("6597edab-4bda-4c1e-af4b-551c4cf74769", uuid.toString())
+    fun `service UUID is the Victron BLE service`() {
+        assertEquals("68c10001-b17f-4d3a-a290-34ad6499937c", VictronRegisters.SERVICE_UUID.toString())
     }
 
     @Test
-    fun `service UUID is register 0x0000`() {
-        assertEquals("65970000-4bda-4c1e-af4b-551c4cf74769", VictronRegisters.SERVICE_UUID.toString())
+    fun `write UUID is characteristic 68c10002`() {
+        assertEquals("68c10002-b17f-4d3a-a290-34ad6499937c", VictronRegisters.WRITE_UUID.toString())
+    }
+
+    @Test
+    fun `notify UUID is characteristic 68c10003`() {
+        assertEquals("68c10003-b17f-4d3a-a290-34ad6499937c", VictronRegisters.NOTIFY_UUID.toString())
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

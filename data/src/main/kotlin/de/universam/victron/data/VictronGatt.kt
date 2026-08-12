@@ -157,42 +157,31 @@ public class VictronGatt(context: Context) {
         @SuppressLint("MissingPermission")
         suspend fun writeKeepAlive(gatt: BluetoothGatt): Boolean? {
             val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: return null
-            val char = service.getCharacteristic(VictronRegisters.KEEP_ALIVE_UUID) ?: return null
+            val char = service.getCharacteristic(VictronRegisters.WRITE_UUID) ?: return null
             return writeCharacteristic(gatt, char, KEEP_ALIVE_PAYLOAD)
         }
 
         @SuppressLint("MissingPermission")
         suspend fun writeTransport(gatt: BluetoothGatt, payload: ByteArray): Boolean? {
             val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: return null
-            // The transport characteristic uses the same UUID pattern. Some devices use a
-            // dedicated handle; we try the service's first writable characteristic that isn't
-            // keep-alive. Fallback: write directly to the register UUID.
-            val char = service.characteristics.firstOrNull {
-                it.uuid != VictronRegisters.KEEP_ALIVE_UUID &&
-                    (it.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
-            } ?: return null
+            val char = service.getCharacteristic(VictronRegisters.WRITE_UUID) ?: return null
             return writeCharacteristic(gatt, char, payload)
         }
 
         /**
-         * Writes payload to the transport characteristic and waits for a notification response.
+         * Writes payload to the write characteristic and waits for a notification response.
          */
         @SuppressLint("MissingPermission")
         suspend fun writeAndNotify(gatt: BluetoothGatt, payload: ByteArray): ByteArray? {
             val service = gatt.getService(VictronRegisters.SERVICE_UUID) ?: return null
-            val char = service.characteristics.firstOrNull {
-                it.uuid != VictronRegisters.KEEP_ALIVE_UUID &&
-                    (it.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
-            } ?: return null
+            val writeChar = service.getCharacteristic(VictronRegisters.WRITE_UUID) ?: return null
+            val notifyChar = service.getCharacteristic(VictronRegisters.NOTIFY_UUID) ?: writeChar
 
             // Enable notifications
-            val notifyChar = service.characteristics.firstOrNull {
-                (it.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
-            } ?: char
             gatt.setCharacteristicNotification(notifyChar, true)
 
             notifyDeferred = CompletableDeferred()
-            writeCharacteristic(gatt, char, payload) ?: return null
+            writeCharacteristic(gatt, writeChar, payload) ?: return null
             return notifyDeferred?.await()
         }
 

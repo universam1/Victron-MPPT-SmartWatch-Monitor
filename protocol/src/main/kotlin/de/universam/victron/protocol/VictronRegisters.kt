@@ -16,21 +16,22 @@ public object VictronRegisters {
 
     // ---- GATT UUIDs -------------------------------------------------------------------------
 
-    /** Base UUID: replace XXXX with a 4-digit hex register ID or control word. */
-    private const val UUID_TEMPLATE = "6597%04x-4bda-4c1e-af4b-551c4cf74769"
-
-    /** Primary service UUID (register 0x0000). */
-    public val SERVICE_UUID: UUID = registerUuid(0x0000)
-
-    /** Keep-alive characteristic — write periodically to hold the connection open. */
-    public val KEEP_ALIVE_UUID: UUID = registerUuid(0xFFFF)
-
     /**
-     * Builds the GATT characteristic UUID for a register.
-     * The pattern is `6597XXXX-4bda-4c1e-af4b-551c4cf74769`.
+     * Victron BLE GATT service and characteristics.
+     *
+     * From VictronConnect APK disassembly: the actual service is `68c10001-...`, NOT
+     * `6597xxxx-...` (which is only documented for SmartShunts in community projects).
      */
-    public fun registerUuid(register: Int): UUID =
-        UUID.fromString(String.format(UUID_TEMPLATE, register and 0xFFFF))
+    public val SERVICE_UUID: UUID =
+        UUID.fromString("68c10001-b17f-4d3a-a290-34ad6499937c")
+
+    /** Write characteristic — TX to device. */
+    public val WRITE_UUID: UUID =
+        UUID.fromString("68c10002-b17f-4d3a-a290-34ad6499937c")
+
+    /** Notify characteristic — RX from device. */
+    public val NOTIFY_UUID: UUID =
+        UUID.fromString("68c10003-b17f-4d3a-a290-34ad6499937c")
 
     // ---- Register IDs -----------------------------------------------------------------------
 

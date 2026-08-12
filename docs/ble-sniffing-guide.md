@@ -1,138 +1,206 @@
-# Sniffing Victron BLE GATT Traffic with nRF Connect
+# Victron BLE GATT Protocol — Reverse-Engineered from VictronConnect
 
-This guide explains how to capture the BLE GATT communication between VictronConnect and
-your SmartSolar MPPT, so you can verify or adjust the register framing used in the load
-output control feature.
+This document captures the BLE protocol used by VictronConnect to read/write registers
+(including load output control) on Victron SmartSolar MPPTs. Extracted by decompiling
+the VictronConnect Android APK.
 
-## What you need
+## Architecture (from APK disassembly)
 
-- Android phone with **nRF Connect** (Nordic Semiconductor, free on Play Store)
-- **Wireshark** on a PC (optional, for deeper analysis)
-- **Android Developer Options → Enable Bluetooth HCI snoop log** (for full pcap capture)
-- Your Victron MPPT with BLE enabled and the PIN code (default: `000000`)
+VictronConnect uses a **two-layer** BLE architecture:
 
-## Method 1: nRF Connect (interactive, quick)
-
-### Step 1: Bond with the device
-
-1. Open **nRF Connect** → Scanner → find your device (name like `SmartSolar HQ...`)
-2. Tap **Connect** → the device will request pairing (enter PIN `000000`)
-3. Once connected you'll see the GATT service list
-
-### Step 2: Find the Victron service
-
-Look for service UUID:
 ```
-65970000-4bda-4c1e-af4b-551c4cf74769
+VeSmartDevice (high-level device model)
+  └── VeSmartService (CBOR-framed path-based protocol over BLE)
+        ├── keepAliveTimer (periodic heartbeat)
+        ├── writeCbor() → 68c10002 characteristic
+        └── notifications ← 68c10003 characteristic
+  └── VeService (pin code, device info, DFU trigger)
+  └── VeRegsHelper (maps vreg codes ↔ item paths)
+        ├── getItemPathFromVeRegCode(0xEDAB, deviceId) → path string
+        └── getVeRegCodeFromItemPath(path, deviceId) → 0xEDAB
 ```
 
-Expand it. You'll see characteristics like:
-- `6597ffff-...` — Keep-alive (write periodically to hold connection)
-- One or more writable characteristics (the transport)
-- Possibly `6597edab-...` — direct Load Output Control register
+### Key finding: NOT raw VE.Direct HEX over BLE
 
-### Step 3: Write keep-alive
+The BLE protocol is **not** the VE.Direct HEX protocol (`":7ABED00..."`) tunneled over a
+characteristic. That protocol is only used over serial/USB (VE.Direct port).
 
-Write `0x01` to `6597FFFF-...` (Write Request, not Write Command). This holds the
-connection open for ~60 seconds.
+Over BLE, VictronConnect uses a **higher-level path-based protocol** with CBOR encoding,
+chunk-based flow control, and opcode framing on a control characteristic.
 
-### Step 4: Toggle load output
+## BLE Service & Characteristics
 
-**Option A — Direct register write** (try this first):
-Write to `6597EDAB-...` the value `0x05` (ON) or `0x04` (OFF).
+| UUID | Role |
+|------|------|
+| `68c10001-b17f-4d3a-a290-34ad6499937c` | Primary service |
+| `68c10002-b17f-4d3a-a290-34ad6499937c` | Write (TX to device) |
+| `68c10003-b17f-4d3a-a290-34ad6499937c` | Notify (RX from device) |
 
-**Option B — VREG framing on transport char**:
-If option A doesn't work, find the writable transport characteristic and write:
+The `6597xxxx-4bda-4c1e-af4b-551c4cf74769` UUID pattern (from community docs about
+SmartShunts) is **NOT** used by SmartSolar MPPTs in VictronConnect.
+
+## Connection Flow (from symbol analysis)
+
+1. **Discover** service `68c10001-...`
+2. **Subscribe** to notifications on `68c10003-...`
+3. **Authenticate** — write PIN code via `VeService::PinCodeUuid` characteristic
+   - Default PIN: `000000` (six zeros)
+   - PUK code recovery exists for locked devices
+4. **Negotiate chunk size** — `VeSmartService::writeCborChunkSize(maxChunk, mtu)`
+5. **Keep-alive** — `VeSmartService::sendKeepAlive()` on a timer
+6. **Exchange data** — CBOR-encoded path-value operations:
+   - `setPathValue(deviceId, pathIndex, value)` — write a register
+   - `getPathValue(deviceId, pathIndex)` — read a register
+   - Flow control: `writeReadyToReceive()` / `freeChunkTimerTimeout()`
+
+## Register Mapping
+
+VictronConnect does NOT write raw register IDs over BLE. It uses a **path index** system:
+
 ```
-08 00 19 AB ED 41 05   (set load output = ALWAYS_ON)
-08 00 19 AB ED 41 04   (set load output = ALWAYS_OFF)
+VeRegsHelper::getItemPathFromVeRegCode(0xEDAB, deviceId)
+  → returns a path string like "/Settings/LoadOutputControl"
+  → mapped to a numeric pathIndex by getPathList()
 ```
 
-### Step 5: Read back state
+The device reports its available paths via `VeSmartService::getPathList(deviceId)`.
+Each path has an integer index. Reads and writes use this index, not the raw vreg hex.
 
-Read characteristic `6597EDA8-...` — value `0x01` means ON, `0x00` means OFF.
+## Load Output Control
 
-Or write the read command to the transport:
+From the product definition XML embedded in the binary:
+
+```xml
+<vreg label="load_control" has_load="1" get="0xEDAB"/>
 ```
-08 00 17 A8 ED
+
+The QML UI code:
+```javascript
+// Toggle switch in VictronConnect:
+Switch {
+    id: loadOutputSwitch
+    checked: items.settings.mode.value === 3
+}
+
+// Setting load output mode:
+items.settings.loadOperationMode.setValue(4)  // Always ON
+items.settings.loadOperationMode.setValue(1)  // Normal/Auto
+
+// The "mode" register determines on/off:
+items.settings.mode.setValue(3)  // ON (value 0x03)
+items.settings.mode.setValue(4)  // OFF
 ```
-And watch for a notification response.
 
-### Step 6: Verify with VictronConnect
+**Important**: VictronConnect uses **two registers together**:
+- `loadOperationMode` (vreg `0xEDAB`) — the load algorithm (1=auto, 4=always on)
+- `mode` (device mode register) — also plays a role in the on/off state
 
-Open VictronConnect on another phone and check that the load output state matches.
+Setting `loadOperationMode = 4` means "always on" (overrides mode).
+Setting `loadOperationMode = 1` + `mode = 3` means "on, normal operation".
 
-## Method 2: Bluetooth HCI snoop log (full pcap)
+## Implications for Our Implementation
 
-This captures **all** BLE traffic at the HCI level, giving you the exact bytes exchanged.
+The current `VictronGatt.kt` assumes:
+1. ❌ Service UUID `65970000-...` → actually `68c10001-...`
+2. ❌ Direct register-UUID writes → actually CBOR path-based protocol
+3. ❌ Simple `08 00 19` framing → actually chunk-based CBOR with flow control
+4. ✅ PIN code `000000` is correct
+5. ✅ Register `0xEDAB` is the right register for load output control
+6. ✅ Keep-alive is needed
 
-### Enable HCI snoop log
+### What needs to change
+
+The GATT layer needs to implement the VeSmartService protocol:
+1. Connect to `68c10001-...` service
+2. Write PIN to authenticate
+3. Negotiate CBOR chunk size based on MTU
+4. Request path list from device (maps vreg → pathIndex)
+5. Use `setPathValue(deviceId, pathIndex, value)` to write the register
+6. Properly encode as CBOR chunks with flow control
+
+This is significantly more complex than a simple characteristic write. The recommended
+path is to **sniff the exact byte sequence** with an HCI log (see below) and replay it,
+rather than implementing the full VeSmartService protocol stack.
+
+---
+
+## How to Sniff with nRF Connect / HCI Log
+
+### Method 1: Bluetooth HCI snoop log (recommended)
+
+This captures **all** BLE traffic at the HCI level — the exact bytes VictronConnect sends.
+
+#### Enable HCI snoop log
 
 1. **Settings → Developer Options → Enable Bluetooth HCI snoop log** (toggle ON)
 2. Toggle Bluetooth off/on to start a fresh log
-3. Perform the action in VictronConnect (toggle load output)
+3. Open VictronConnect, connect to your MPPT, toggle the load output
 4. Retrieve the log:
-   ```
+   ```sh
    adb pull /data/misc/bluetooth/logs/btsnoop_hci.log
    ```
    or on newer Android:
-   ```
+   ```sh
    adb bugreport victron-sniff.zip
    # Extract btsnoop_hci.log from the zip
    ```
 
-### Analyze in Wireshark
+#### Analyze in Wireshark
 
 1. Open `btsnoop_hci.log` in Wireshark
-2. Filter: `btatt` (shows only ATT protocol — GATT reads/writes)
-3. Look for Write Request/Command frames to handles on the Victron device
-4. The payload bytes show the exact framing
+2. Filter: `btatt.opcode == 0x12 || btatt.opcode == 0x1b` (Write Request + Notifications)
+3. Look for writes to the handle backing `68c10002-...`
+4. The payload bytes are the exact CBOR frames
 
-### What to look for
+#### What to capture
 
-| Operation | Wireshark filter | What you'll see |
-|-----------|-----------------|-----------------|
-| Service discovery | `btatt.opcode == 0x10` | Read By Group Type responses listing services |
-| Write keep-alive | `btatt.opcode == 0x12` | Write Request to handle of `6597FFFF` |
-| Write register | `btatt.opcode == 0x12` | Write Request with `08 00 19 AB ED ...` payload |
-| Notification | `btatt.opcode == 0x1b` | Handle Value Notification with response frame |
+Do this sequence in VictronConnect while the HCI log is running:
+1. Connect to your MPPT (captures auth + path list negotiation)
+2. Go to Settings → Load output → toggle it ON
+3. Toggle it OFF
+4. Disconnect
 
-### Decode the response
+This gives you the complete byte sequence for both operations. You can then
+hard-code these exact frames in `VictronGatt.kt` rather than implementing the
+full protocol — simpler and guaranteed to work for your specific device.
 
-A response notification looks like:
-```
-08 00 19 A8 ED 41 01
-         ^^^^^ register 0xEDA8 (load state) little-endian
-               ^^ CBOR byte string, length 1
-                  ^^ value: 0x01 = ON
-```
+### Method 2: nRF Connect (interactive exploration)
 
-## Key register reference
+1. Open **nRF Connect** → Scanner → find your device (name like `SmartSolar HQ...`)
+2. Tap **Connect** → enter PIN `000000` when prompted
+3. Look for service `68c10001-b17f-4d3a-a290-34ad6499937c`
+4. Enable notifications on `68c10003-...`
+5. Write bytes to `68c10002-...` and observe responses
+
+This is useful for interactive experimentation once you have the byte sequences
+from the HCI capture.
+
+## Key Register Reference
 
 | Register | Name | Access | Values |
 |----------|------|--------|--------|
-| `0xEDAB` | Load Output Control | R/W | 0=OFF, 1=AUTO, 4=ALWAYS_OFF, 5=ALWAYS_ON |
+| `0xEDAB` | Load Output Control | R/W | 0=OFF, 1=AUTO, 4=ALWAYS_ON, 5=ALWAYS_ON(alt) |
 | `0xEDA8` | Load Output State | R | 0=OFF, 1=ON |
 | `0xED9D` | Load switch high (V) | R/W | un16, ×0.01 V |
 | `0xED9C` | Load switch low (V) | R/W | un16, ×0.01 V |
 
-## Troubleshooting
+## Product IDs with Load Output
 
-- **Connection drops immediately**: You're not writing keep-alive. Write `0x01` to
-  `6597FFFF` within a few seconds of connecting, and again every 30s.
-- **Write returns error**: Device may not support direct register-UUID writes. Try the
-  VREG framing on the transport characteristic instead.
-- **No notification after read request**: Enable notifications on the characteristic first
-  (write `0x01 0x00` to the CCCD descriptor, handle = char handle + 1).
-- **PIN rejected**: Some devices use `000000` (6 zeros), others use a custom PIN set in
-  VictronConnect.
+From the VictronConnect product definition, these product IDs have `has_load` capability:
+```
+0xA04C, 0xA054, 0xA042, 0xA053, 0xA043, 0xA055, 0xA066, 0xA05F,
+0xA067, 0xA060, 0xA07B, 0xA079, 0xA07C, 0xA074, 0xA07A, 0xA07D,
+0xA07F, 0xA075
+```
 
-## Updating the app after sniffing
+The capability is reported via register `0x0140` (firmware ≥ 1.16), bit `0x0001`.
 
-Once you confirm the exact write path, update `VictronGatt.kt`:
+## Next Steps
 
-- If direct register-UUID writes work: simplify `writeTransport()` to write directly to
-  `registerUuid(LOAD_OUTPUT_CONTROL)` instead of searching for a transport characteristic.
-- If VREG framing is needed (likely): the current implementation already does this — verify
-  the exact bytes match what you captured.
-- If there's an init/auth handshake: add it before the register write in `withGatt()`.
+1. **Capture HCI log** of VictronConnect toggling load output on your specific MPPT
+2. **Extract the exact byte frames** from Wireshark (Write Request payloads to 68c10002)
+3. **Update `VictronGatt.kt`** to replay those frames:
+   - Fix service UUID to `68c10001-...`
+   - Implement the auth + keepalive handshake
+   - Hard-code the set-path-value CBOR frames for load output
+4. **Test** on hardware
