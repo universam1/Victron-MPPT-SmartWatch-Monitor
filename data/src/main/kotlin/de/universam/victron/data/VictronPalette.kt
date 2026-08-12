@@ -17,6 +17,16 @@ public object VictronPalette {
     public const val YIELD: Int = 0xFF9CCC65.toInt()
     public const val ERROR: Int = 0xFFFF6B6B.toInt()
 
+    // Heat-gradient stops for the PV arc (low → mid → high power)
+    public const val HEAT_LOW: Int = 0xFFFFC531.toInt()    // SOLAR yellow
+    public const val HEAT_MID: Int = 0xFFFF8C00.toInt()    // dark orange
+    public const val HEAT_HIGH: Int = 0xFFFF3D00.toInt()   // fire-red
+
+    // Battery current gradient stops (charging direction)
+    public const val CURRENT_LOW: Int = 0xFF7ED957.toInt()   // CHARGING green
+    public const val CURRENT_MID: Int = 0xFFCCDB39.toInt()   // yellow-green
+    public const val CURRENT_HIGH: Int = 0xFFFF8A5C.toInt()  // orange
+
     public const val TRACK: Int = 0xFF2A2D33.toInt()
     public const val TEXT: Int = 0xFFFFFFFF.toInt()
     public const val TEXT_DIM: Int = 0xFF9AA0A6.toInt()

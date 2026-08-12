@@ -194,19 +194,10 @@ internal fun HeroContent(
 
             // ── Detail rows as Wear M3 Buttons ──
             item {
-                DetailButton(
-                    icon = Icons.Filled.BatteryChargingFull,
-                    label = stringResource(R.string.label_battery),
-                    value = Formatting.volts(values?.batteryVoltage),
-                    valueColor = Color(VictronPalette.BATTERY),
-                )
-            }
-            item {
-                DetailButton(
-                    icon = Icons.Filled.WbSunny,
-                    label = stringResource(R.string.label_pv),
-                    value = Formatting.watts(values?.batteryPowerW),
-                    valueColor = Color(VictronPalette.SOLAR),
+                BatteryDetailButton(
+                    voltage = Formatting.volts(values?.batteryVoltage),
+                    current = Formatting.amps(values?.batteryCurrent),
+                    power = Formatting.watts(values?.batteryPowerW),
                 )
             }
             item {
@@ -319,6 +310,11 @@ internal fun GaugeFace(
             color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
+            gradientColors = if (stale) null else listOf(
+                Color(VictronPalette.HEAT_LOW),
+                Color(VictronPalette.HEAT_MID),
+                Color(VictronPalette.HEAT_HIGH),
+            ),
         )
         PowerArc(
             fraction = snapshot?.batteryCurrentFraction(batteryCurrentMax) ?: 0f,
@@ -328,6 +324,11 @@ internal fun GaugeFace(
             strokeWidth = 11.dp,
             startAngle = 38f,
             sweepAngle = 104f,
+            gradientColors = if (stale) null else listOf(
+                Color(VictronPalette.CURRENT_LOW),
+                Color(VictronPalette.CURRENT_MID),
+                Color(VictronPalette.CURRENT_HIGH),
+            ),
         )
 
         Column(
@@ -410,7 +411,7 @@ internal fun GaugeFace(
 
 /** A Wear M3 Button styled as a detail row: icon + label on the left, value on the right. */
 @Composable
-private fun DetailButton(icon: ImageVector, label: String, value: String, valueColor: Color) {
+internal fun DetailButton(icon: ImageVector, label: String, value: String, valueColor: Color) {
     Button(
         onClick = {},
         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
@@ -444,6 +445,45 @@ private fun DetailButton(icon: ImageVector, label: String, value: String, valueC
                 style = MaterialTheme.typography.titleSmall,
                 color = valueColor,
             )
+        }
+    }
+}
+
+/** Battery detail: icon + label on top, three values right-aligned below. */
+@Composable
+internal fun BatteryDetailButton(voltage: String, current: String, power: String) {
+    Button(
+        onClick = {},
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(VictronPalette.SURFACE),
+        ),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.BatteryChargingFull,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(VictronPalette.TEXT_DIM),
+                )
+                Text(
+                    text = stringResource(R.string.label_battery),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(VictronPalette.TEXT_DIM),
+                )
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                Text(text = voltage, style = MaterialTheme.typography.titleSmall, color = Color(VictronPalette.BATTERY))
+                Text(text = current, style = MaterialTheme.typography.titleSmall, color = Color(VictronPalette.BATTERY))
+                Text(text = power, style = MaterialTheme.typography.titleSmall, color = Color(VictronPalette.BATTERY))
+            }
         }
     }
 }

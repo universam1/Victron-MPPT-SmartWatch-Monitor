@@ -12,6 +12,22 @@ connectionless BLE *Instant Readout* advertisements. Kotlin, Gradle, builds head
 VICTRON_NATIVE=1 ./build.sh apk   # use a local JDK 17+/Android SDK instead of Docker
 ```
 
+**Always use the container** (`./build.sh`) to compile and verify locally — even when a native JDK is
+available. The container is the source of truth; if it doesn't build there, it doesn't ship.
+
+**Always update screenshot tests** after any UI change. The project has Compose Preview Screenshot
+tests (`screenshotTest` source sets) that act as visual regression goldens:
+
+```sh
+./build.sh screenshots       # regenerate reference PNGs
+```
+
+This regenerates the reference PNGs under `*/screenshotTestDebug/reference/`. Commit the updated
+images alongside the code change. The previews in `WearPreviews.kt` and `DashboardPreviews.kt` must
+reflect the current spec — if the UI changes, update the preview composables first, then regenerate.
+After regenerating, **read the PNGs with the Read tool** and verify them visually against the specs
+below before committing.
+
 Versions live in [gradle/libs.versions.toml](gradle/libs.versions.toml). CI
 ([.github/workflows/build.yml](.github/workflows/build.yml)) runs the protocol tests without an
 Android SDK, then the `:data` unit tests and both APKs.
@@ -99,3 +115,30 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   no `HorizontalPager`: it fights the system swipe-to-dismiss gesture and leaves a blank page behind
   when navigation returns. Leaving the hero screen is a `Button` at the end of the list.
 - No dependency injection framework: `VictronData` is the whole graph.
+
+## Visual specs
+
+Keep this section updated when the UI changes. Screenshots are verified against these definitions.
+
+### Arc gauges — heat gradient
+
+Both arc gauges paint a **sweep gradient along their length** (not a flat color):
+
+| Arc | Geometry | Gradient (start → tip) |
+|---|---|---|
+| PV power (wear + mobile) | 240°, starts 150° | `HEAT_LOW` yellow → `HEAT_MID` orange → `HEAT_HIGH` fire-red |
+| Battery current (wear) | 104°, starts 38° | `CURRENT_LOW` green → `CURRENT_MID` yellow-green → `CURRENT_HIGH` orange |
+
+Implementation: `Brush.sweepGradient` inside a `rotate(startAngle)` transform, then `drawArc` from
+0° so the gradient aligns with the arc start. The glow layer uses the tip color at reduced alpha.
+
+When **stale**, both arcs fall back to flat `TEXT_DIM` (no gradient).
+
+### Wear hero detail buttons
+
+The battery row is a **single merged DetailButton** showing all three values:
+`"13.2 V  1.8 A  24 W"` — voltage, current, charging power — in `BATTERY` blue.
+Icon: `BatteryChargingFull`. Label: `label_battery` ("Battery" / "Batterie").
+
+The old separate "Solar" button (`label_pv`) that showed `batteryPowerW` is removed — that value was
+mislabeled (it is battery V × A, not PV power).

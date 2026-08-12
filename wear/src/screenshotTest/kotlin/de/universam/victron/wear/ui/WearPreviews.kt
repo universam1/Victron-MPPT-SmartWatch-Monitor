@@ -6,26 +6,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.android.tools.screenshot.PreviewTest
@@ -78,6 +69,11 @@ fun PreviewPowerArc() {
             color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
+            gradientColors = listOf(
+                Color(VictronPalette.HEAT_LOW),
+                Color(VictronPalette.HEAT_MID),
+                Color(VictronPalette.HEAT_HIGH),
+            ),
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.Bottom) {
@@ -162,48 +158,23 @@ fun PreviewDetailList() {
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            PreviewDetailButton(Icons.Filled.BatteryChargingFull, "Battery", Formatting.volts(values?.batteryVoltage), Color(VictronPalette.BATTERY))
-            PreviewDetailButton(Icons.Filled.WbSunny, "Solar", Formatting.watts(values?.batteryPowerW), Color(VictronPalette.SOLAR))
-            PreviewDetailButton(Icons.Filled.PowerSettingsNew, "State", values?.chargerStateLabel ?: "–", Color(VictronPalette.TEXT_DIM))
-            PreviewDetailButton(Icons.Filled.WbSunny, "Yield today", Formatting.energy(values?.yieldTodayWh), Color(VictronPalette.YIELD))
-        }
-    }
-}
-
-@Composable
-private fun PreviewDetailButton(icon: ImageVector, label: String, value: String, valueColor: Color) {
-    Button(
-        onClick = {},
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(VictronPalette.SURFACE),
-        ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = Color(VictronPalette.TEXT_DIM),
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(VictronPalette.TEXT_DIM),
-                )
-            }
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleSmall,
-                color = valueColor,
+            // Uses the real composables from HeroScreen (internal visibility)
+            BatteryDetailButton(
+                voltage = Formatting.volts(values?.batteryVoltage),
+                current = Formatting.amps(values?.batteryCurrent),
+                power = Formatting.watts(values?.batteryPowerW),
+            )
+            DetailButton(
+                icon = Icons.Filled.PowerSettingsNew,
+                label = "State",
+                value = values?.chargerStateLabel ?: "–",
+                valueColor = Color(VictronPalette.TEXT_DIM),
+            )
+            DetailButton(
+                icon = Icons.Filled.WbSunny,
+                label = "Yield today",
+                value = Formatting.energy(values?.yieldTodayWh),
+                valueColor = Color(VictronPalette.YIELD),
             )
         }
     }

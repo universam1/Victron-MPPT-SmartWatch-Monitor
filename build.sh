@@ -9,6 +9,7 @@
 #   ./build.sh lint           Android lint on both apps
 #   ./build.sh install-wear   install the watch APK on a connected/paired watch (adb)
 #   ./build.sh install-mobile install the phone APK
+#   ./build.sh screenshots     update screenshot test reference images
 #   ./build.sh shell          interactive shell inside the build container
 #   ./build.sh gradle <args>  run gradle with your own arguments
 #
@@ -80,6 +81,9 @@ case "${1:-apk}" in
         ;;
     check)
         run_gradle :protocol:test :data:testDebugUnitTest :wear:assembleDebug :mobile:assembleDebug
+        ;;
+    screenshots)
+        run_gradle :wear:updateDebugScreenshotTest :mobile:updateDebugScreenshotTest
         ;;
     install-wear)
         # adb runs on the host: the watch is paired with your machine, not with the container.

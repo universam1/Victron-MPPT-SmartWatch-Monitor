@@ -22,9 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,7 +39,6 @@ private const val START_ANGLE = 150f
 private const val SWEEP_ANGLE = 240f
 
 private val SOLAR = Color(VictronPalette.SOLAR)
-private val SOLAR_GLOW = Color(0xFF_FFD54F).copy(alpha = 0.35f)
 private val TRACK = Color(0xFF1A2332)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 
@@ -100,30 +101,85 @@ fun PvArcGauge(
             )
 
             if (animated > 0f) {
-                val fillColor = if (stale) TEXT_DIM else SOLAR
-                val glow = if (stale) Color.Transparent else SOLAR_GLOW
+                if (stale) {
+                    // Stale: flat dim color, no gradient
+                    drawArc(
+                        color = TEXT_DIM,
+                        startAngle = START_ANGLE,
+                        sweepAngle = SWEEP_ANGLE * animated,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = stroke,
+                    )
+                } else {
+                    // Heat gradient: yellow → orange → red along the arc
+                    val arcFraction = SWEEP_ANGLE / 360f
+                    val heatLow = Color(VictronPalette.HEAT_LOW)
+                    val heatMid = Color(VictronPalette.HEAT_MID)
+                    val heatHigh = Color(VictronPalette.HEAT_HIGH)
+                    val stops = arrayOf(
+                        0f to heatLow,
+                        arcFraction * 0.5f to heatMid,
+                        arcFraction to heatHigh,
+                        1f to heatHigh,
+                    )
+                    val brush = Brush.sweepGradient(colorStops = stops, center = center)
+                    val glowColor = heatLow.copy(alpha = 0.35f)
 
-                // Glow layer — wider, translucent
-                drawArc(
-                    color = glow,
-                    startAngle = START_ANGLE,
-                    sweepAngle = SWEEP_ANGLE * animated,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = glowStroke,
-                )
+                    // Butt caps for gradient + round-cap dots at endpoints for clean edges.
+                    // Glow keeps Round caps since it's a single color.
+                    val buttStroke = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                    val glowRoundStroke = Stroke(width = glowWidth, cap = StrokeCap.Round)
+                    val capRadius = arcSize.width / 2f
+                    val capAngle = strokeWidth / capRadius * (180f / Math.PI.toFloat()) * 0.1f
 
-                // Main arc
-                drawArc(
-                    color = fillColor,
-                    startAngle = START_ANGLE,
-                    sweepAngle = SWEEP_ANGLE * animated,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = stroke,
-                )
+                    rotate(degrees = START_ANGLE, pivot = center) {
+                        drawArc(
+                            color = glowColor,
+                            startAngle = 0f,
+                            sweepAngle = SWEEP_ANGLE * animated,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = glowRoundStroke,
+                        )
+                        drawArc(
+                            brush = brush,
+                            startAngle = 0f,
+                            sweepAngle = SWEEP_ANGLE * animated,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = buttStroke,
+                        )
+                        // Start cap
+                        drawArc(
+                            color = heatLow,
+                            startAngle = -capAngle,
+                            sweepAngle = capAngle * 2,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        )
+                        // End cap — lerp color at the tip position
+                        val tipFrac = animated.coerceIn(0f, 1f)
+                        val tipColor = when {
+                            tipFrac < 0.5f -> androidx.compose.ui.graphics.lerp(heatLow, heatMid, tipFrac * 2f)
+                            else -> androidx.compose.ui.graphics.lerp(heatMid, heatHigh, (tipFrac - 0.5f) * 2f)
+                        }
+                        drawArc(
+                            color = tipColor,
+                            startAngle = SWEEP_ANGLE * animated - capAngle,
+                            sweepAngle = capAngle * 2,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                        )
+                    }
+                }
             } else {
                 // Minimal dot at the start so the arc is identifiable even at 0.
                 val fillColor = if (stale) TEXT_DIM else SOLAR

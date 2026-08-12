@@ -29,7 +29,6 @@
     <string name="status_undecoded">Record-Typ noch nicht unterstützt</string>
 
     <string name="label_battery">Batterie</string>
-    <string name="label_pv">Solar</string>
     <string name="label_yield_today">Ertrag heute</string>
     <string name="label_state">Zustand</string>
     <string name="label_error">Fehler</string>
