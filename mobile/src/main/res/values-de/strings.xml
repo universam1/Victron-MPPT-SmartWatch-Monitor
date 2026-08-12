@@ -45,6 +45,7 @@
     <string name="label_payload">Entschlüsselte Nutzdaten</string>
 
     <string name="dashboard_setup">Einrichtung</string>
+    <string name="no_device">Noch kein Victron-Gerät</string>
     <string name="dashboard_view">Anzeige</string>
     <string name="label_battery_current">Batteriestrom</string>
     <string name="label_voltage">Spannung</string>

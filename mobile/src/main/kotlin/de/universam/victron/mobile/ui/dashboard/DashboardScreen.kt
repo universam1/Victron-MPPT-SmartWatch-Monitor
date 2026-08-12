@@ -31,7 +31,11 @@ private val TRACK = Color(0xFF1A2332)
 
 /**
  * Top-level dashboard: pages through decoded devices with a horizontal pager. The last page
- * triggers navigation to setup — swipe past the last device to open settings.
+ * triggers navigation to setup — swipe past the last device to open settings, or use the gear
+ * button, which works even when nothing has been found yet.
+ *
+ * With no decoded device there is still one page: the dashboard renders with `–` everywhere so the
+ * screen and its navigation work without a Victron in range.
  */
 @Composable
 fun DashboardScreen(
@@ -43,15 +47,14 @@ fun DashboardScreen(
 ) {
     val decoded = snapshots.filter { it.status == SnapshotStatus.DECODED }
     val bgBrush = Brush.verticalGradient(listOf(BG_TOP, BG_BOTTOM))
-    // Pages: one per device + one final "settings" page
-    val pageCount = decoded.size + 1
-    val pagerState = rememberPagerState { pageCount }
+    // One page per device — plus a placeholder page when there is no device yet — and one final
+    // "settings" page that only exists to make a swipe past the end open setup.
+    val devicePages = decoded.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState { devicePages + 1 }
 
     // When the user lands on the settings page, open setup
     LaunchedEffect(pagerState.currentPage) {
-        if (decoded.isNotEmpty() && pagerState.currentPage == decoded.size) {
-            onOpenSetup()
-        }
+        if (pagerState.currentPage == devicePages) onOpenSetup()
     }
 
     Box(
@@ -63,14 +66,17 @@ fun DashboardScreen(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
-            if (page < decoded.size) {
-                val snapshot = decoded[page]
+            if (page < devicePages) {
+                val snapshot = decoded.getOrNull(page)
                 DeviceDashboard(
                     snapshot = snapshot,
-                    peakWatts = config.pvPeakWattsFor(snapshot.address),
+                    peakWatts = snapshot?.let { config.pvPeakWattsFor(it.address) } ?: 0,
                     now = now,
                     modifier = Modifier.fillMaxSize(),
-                    history = history[snapshot.address.uppercase()],
+                    history = snapshot?.let { history[it.address.uppercase()] },
+                    // Always-available way into setup, so navigation never depends on finding a
+                    // device first.
+                    onOpenSetup = onOpenSetup,
                 )
             } else {
                 // Empty placeholder — LaunchedEffect navigates away immediately

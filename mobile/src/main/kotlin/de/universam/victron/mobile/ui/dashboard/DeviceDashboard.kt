@@ -17,9 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -47,21 +49,28 @@ private val TRACK = Color(0xFF1A2332)
 private val SURFACE = Color(0xFF121E2E)
 private val SURFACE_LIGHT = Color(0xFF1A2940)
 
+/** Full scale of the gauge when there is no device and no configured array size yet. */
+private const val FALLBACK_SCALE_W = 50
+
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
  * a charger state chip, battery current bar with sparkline, then value tiles with sparklines.
+ *
+ * A `null` [snapshot] means no device has been decoded yet: the whole layout still renders, with
+ * `–` for every value and the gauge at zero, so the screen is usable without a Victron in range.
  */
 @Composable
 fun DeviceDashboard(
-    snapshot: DeviceSnapshot,
+    snapshot: DeviceSnapshot?,
     peakWatts: Int,
     now: Long,
     modifier: Modifier = Modifier,
     history: ReadingHistory? = null,
+    onOpenSetup: (() -> Unit)? = null,
 ) {
-    val values = snapshot.solarCharger
-    val stale = Formatting.isStale(snapshot, now)
-    val scaleMax = snapshot.pvScaleMaxW(peakWatts)
+    val values = snapshot?.solarCharger
+    val stale = snapshot != null && Formatting.isStale(snapshot, now)
+    val scaleMax = snapshot?.pvScaleMaxW(peakWatts) ?: peakWatts.coerceAtLeast(FALLBACK_SCALE_W)
 
     val stateLabel = if (values?.hasError == true) {
         values.chargerErrorLabel ?: "Err ${values.chargerErrorCode}"
@@ -85,24 +94,36 @@ fun DeviceDashboard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = snapshot.displayName,
+                    text = snapshot?.displayName ?: stringResource(R.string.no_device),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium,
                     color = TEXT_PRIMARY,
                 )
-                Text(
-                    text = Formatting.age(snapshot, now),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (stale) ERROR else TEXT_DIM,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = snapshot?.let { Formatting.age(it, now) } ?: Formatting.PLACEHOLDER,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (stale) ERROR else TEXT_DIM,
+                    )
+                    if (onOpenSetup != null) {
+                        IconButton(onClick = onOpenSetup, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.dashboard_setup),
+                                modifier = Modifier.size(20.dp),
+                                tint = TEXT_DIM,
+                            )
+                        }
+                    }
+                }
             }
             HorizontalDivider(color = TRACK, thickness = 1.dp)
         }
 
         // PV Arc Gauge — dominant visual, with sparkline inside
         PvArcGauge(
-            fraction = snapshot.pvFraction(peakWatts),
+            fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
             watts = values?.pvPowerW,
             scaleMaxW = scaleMax,
             stale = stale,

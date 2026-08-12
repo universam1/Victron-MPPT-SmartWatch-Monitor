@@ -73,6 +73,14 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   not propagated; `backgroundScanEnabled`/scan window stay local per device.
 - The gauge scale comes from `DeviceSnapshot.pvScaleMaxW`: configured array size, else the observed
   peak rounded up, floor 50 W. `carryOver` must keep `observedPvPeakW` across advertisements.
+- **The hero/dashboard surfaces render without a device.** `HeroContent` and `DeviceDashboard` take a
+  nullable snapshot: no device means `–` everywhere and arcs at zero, never a fake `0 W`, and every
+  navigation affordance stays reachable — that is what lets the UI be checked without a Victron in
+  range. Do not put them back behind an "empty state" that replaces the screen.
+- **The hero gauge item is sized with `Modifier.fillParentMaxSize()`** (the `ScalingLazyListItemScope`
+  one). A lazy list measures items with an unbounded height, so `fillMaxSize()` there collapses to the
+  content height, the bezel arcs shrink to a sliver, and auto-centering pushes the gauge below the top
+  of the screen.
 
 ## Conventions
 
@@ -80,5 +88,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 - UI strings go through `strings.xml` with a German `values-de` translation. No hardcoded user text.
 - Wear UI sticks to a conservative Compose-for-Wear-OS subset (`ScalingLazyColumn`, `Button`,
   `ListHeader`, `Text`, Material Icons Extended) — HeroScreen is a `ScalingLazyColumn` whose first
-  item is the fullscreen gauge and following items are detail buttons. No separate detail route.
+  item is the fullscreen gauge and following items are detail buttons. No separate detail route, and
+  no `HorizontalPager`: it fights the system swipe-to-dismiss gesture and leaves a blank page behind
+  when navigation returns. Leaving the hero screen is a `Button` at the end of the list.
 - No dependency injection framework: `VictronData` is the whole graph.

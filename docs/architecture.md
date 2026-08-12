@@ -102,7 +102,19 @@ HeroScreen is a `ScalingLazyColumn`: the first item is a fullscreen gauge (240°
 for PV power, watts/amps in the centre), and the following items are Wear M3 Buttons with Material
 Icons showing battery voltage, solar power, charger state, yield, load, signal, model, and age.
 Scrolling the gauge reveals the detail list — there is no separate detail route. Navigation is
-Hero → Overview → Devices.
+Hero → Overview → Devices, via the "Devices" button at the end of the detail list.
+
+Two details are load-bearing:
+
+* The gauge item is sized with `Modifier.fillParentMaxSize()`, the `ScalingLazyListItemScope`
+  variant. A lazy list measures its items with an unbounded height, so a plain `fillMaxSize()`
+  collapses to the content height and the bezel arcs shrink to a sliver around the numbers. A first
+  item exactly one viewport tall is also what makes the column's auto-centering compute a zero top
+  spacer, so the gauge can be scrolled all the way to the top instead of resting below it.
+* Everything renders **without a device**: with nothing decoded, the gauge shows `–` and arcs at
+  zero, the detail rows show `–`, and a status row below the gauge says why (scanning, no device,
+  permission missing) and acts on a tap. So the screen and its navigation can be exercised without
+  a Victron in range — the same is true of the phone dashboard.
 
 Colours come from one place, `data/VictronPalette.kt`, as ARGB ints, because the tile knows nothing
 about Compose: yellow = solar, blue = battery, green = current going in, orange = current going out,

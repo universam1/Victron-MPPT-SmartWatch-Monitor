@@ -116,6 +116,38 @@ fun PreviewWatchFace() {
     }
 }
 
+/** The whole hero surface, so a gauge that collapses inside the lazy list shows up here. */
+@PreviewTest
+@Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
+@Composable
+fun PreviewHero() {
+    Box(modifier = Modifier.size(240.dp)) {
+        HeroContent(
+            snapshot = sampleSnapshot,
+            peakWatts = 380,
+            batteryCurrentMax = 15.0,
+            now = System.currentTimeMillis(),
+            deviceCount = 1,
+        )
+    }
+}
+
+/** No device found yet: same layout, placeholders instead of values, navigation still there. */
+@PreviewTest
+@Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
+@Composable
+fun PreviewHeroEmpty() {
+    Box(modifier = Modifier.size(240.dp)) {
+        HeroContent(
+            snapshot = null,
+            peakWatts = 0,
+            batteryCurrentMax = 15.0,
+            now = System.currentTimeMillis(),
+            status = "No Victron device yet",
+        )
+    }
+}
+
 @PreviewTest
 @Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
