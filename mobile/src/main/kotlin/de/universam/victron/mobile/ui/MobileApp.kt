@@ -116,9 +116,9 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
                 config = config,
                 scanState = scanState,
                 now = now,
-                onOpenDashboard = if (hasDecoded) {
-                    { screen = Screen.Dashboard }
-                } else null,
+                // Reachable with no device too: the dashboard then shows placeholders, which is
+                // enough to check the layout and the navigation without a Victron in range.
+                onOpenDashboard = { screen = Screen.Dashboard },
             )
         }
     }
@@ -131,7 +131,7 @@ private fun SetupContent(
     config: AppConfig,
     scanState: ScanState,
     now: Long,
-    onOpenDashboard: (() -> Unit)?,
+    onOpenDashboard: () -> Unit,
 ) {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -163,10 +163,8 @@ private fun SetupContent(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    if (onOpenDashboard != null) {
-                        OutlinedButton(onClick = onOpenDashboard) {
-                            Text(stringResource(R.string.dashboard_view))
-                        }
+                    OutlinedButton(onClick = onOpenDashboard) {
+                        Text(stringResource(R.string.dashboard_view))
                     }
                 }
             }

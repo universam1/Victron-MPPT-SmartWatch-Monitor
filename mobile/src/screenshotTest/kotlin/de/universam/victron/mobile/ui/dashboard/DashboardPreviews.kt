@@ -101,6 +101,21 @@ fun PreviewDeviceDashboardStale() {
     }
 }
 
+/** No device decoded yet: the dashboard still renders, with placeholders instead of values. */
+@PreviewTest
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 390, heightDp = 800)
+@Composable
+fun PreviewDeviceDashboardEmpty() {
+    Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
+        DeviceDashboard(
+            snapshot = null,
+            peakWatts = 0,
+            now = System.currentTimeMillis(),
+            onOpenSetup = {},
+        )
+    }
+}
+
 @PreviewTest
 @Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 300, heightDp = 300)
 @Composable

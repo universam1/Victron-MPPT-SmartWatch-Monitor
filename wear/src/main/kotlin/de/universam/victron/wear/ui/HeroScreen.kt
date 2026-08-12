@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
@@ -26,12 +24,10 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
@@ -61,6 +58,9 @@ import de.universam.victron.wear.R
 /**
  * Full-bezel power gauge that scrolls down into a detail list — replaces the old HeroScreen +
  * DetailScreen two-screen pattern with a single scrollable surface.
+ *
+ * The gauge renders even when no device has been found yet (all values `–`, arcs at zero), so the
+ * screen and its navigation can be used — and tested — without a Victron in range.
  */
 @Composable
 fun HeroScreen(
@@ -82,171 +82,211 @@ fun HeroScreen(
     var index by remember { mutableIntStateOf(0) }
     val selected = decoded.getOrNull(index.coerceIn(0, (decoded.size - 1).coerceAtLeast(0)))
 
-    val pagerState = rememberPagerState { 2 }
-
-    // Swipe to page 1 → open settings (fires only when page fully settles)
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }
-            .collect { page -> if (page == 1) onOpenDevices() }
-    }
-
-    HorizontalPager(
-        state = pagerState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(VictronPalette.BACKGROUND)),
-    ) { page ->
-        if (page == 0) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    scanState is ScanState.Unavailable -> BlockedState(
-                        reason = scanState.reason,
-                        onGrantPermission = { permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION) },
-                        onOpenDevices = onOpenDevices,
-                    )
-
-                    selected == null -> EmptyState(
-                        scanning = scanState == ScanState.Scanning,
-                        onOpenDevices = onOpenDevices,
-                    )
-
-                    else -> GaugeList(
-                        snapshot = selected,
-                        peakWatts = config.pvPeakWattsFor(selected.address),
-                        batteryCurrentMax = config.batteryCurrentMaxFor(selected.address),
-                        now = now,
-                        deviceCount = decoded.size,
-                        onCycleDevice = { index = (index + 1) % decoded.size },
-                    )
-                }
-            }
-        } else {
-            // Empty placeholder — LaunchedEffect navigates away immediately
-            Box(modifier = Modifier.fillMaxSize())
+    // Why the gauge has nothing to show — null when there is nothing to explain.
+    val blockedBy = (scanState as? ScanState.Unavailable)?.reason
+    val status: String? = when (blockedBy) {
+        ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
+        ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
+        ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
+        is ScanUnavailable.Failed -> "Scan error ${blockedBy.errorCode}"
+        null -> when {
+            selected != null -> null
+            scanState == ScanState.Scanning -> stringResource(R.string.scanning)
+            else -> stringResource(R.string.empty_no_devices)
         }
     }
+
+    HeroContent(
+        snapshot = selected,
+        peakWatts = selected?.let { config.pvPeakWattsFor(it.address) } ?: 0,
+        batteryCurrentMax = selected?.let { config.batteryCurrentMaxFor(it.address) }
+            ?: config.batteryCurrentMaxFor(""),
+        now = now,
+        deviceCount = decoded.size,
+        status = status,
+        onStatusClick = {
+            if (blockedBy == ScanUnavailable.NoPermission) {
+                permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION)
+            } else {
+                onOpenDevices()
+            }
+        },
+        onCycleDevice = { if (decoded.isNotEmpty()) index = (index + 1) % decoded.size },
+        onOpenDevices = onOpenDevices,
+    )
 }
 
+/**
+ * The hero surface itself, without any ViewModel: gauge, optional status row, detail rows and the
+ * settings button that leads to the rest of the app. Kept stateless so previews render the real UI.
+ *
+ * A `null` [snapshot] means "nothing decoded yet" — everything still renders, with placeholders.
+ */
 @Composable
-private fun GaugeList(
-    snapshot: DeviceSnapshot,
+internal fun HeroContent(
+    snapshot: DeviceSnapshot?,
     peakWatts: Int,
     batteryCurrentMax: Double,
     now: Long,
-    deviceCount: Int,
-    onCycleDevice: () -> Unit,
+    deviceCount: Int = 0,
+    status: String? = null,
+    onStatusClick: () -> Unit = {},
+    onCycleDevice: () -> Unit = {},
+    onOpenDevices: () -> Unit = {},
 ) {
-    val values = snapshot.solarCharger
-    val stale = Formatting.isStale(snapshot, now)
-    val solar = if (stale) Color(VictronPalette.TEXT_DIM) else Color(VictronPalette.SOLAR)
-    val currentColor = if (stale) {
-        Color(VictronPalette.TEXT_DIM)
-    } else {
-        Color(VictronPalette.currentColor(values?.batteryCurrent))
-    }
+    val values = snapshot?.solarCharger
+    // Both defaults assume a list that starts with a ListHeader and would open scrolled onto the
+    // *second* item — which here is a detail button, with the gauge above the top of the screen.
+    // The gauge is item 0 and it is what the screen is for, so it is both the initial and the
+    // anchor item.
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
 
-    val listState = rememberScalingLazyListState()
-
-    ScalingLazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(0.dp),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(VictronPalette.BACKGROUND)),
     ) {
-        // ── First item: fullscreen gauge with arcs ──
-        item {
-            GaugeFace(
-                snapshot = snapshot,
-                peakWatts = peakWatts,
-                batteryCurrentMax = batteryCurrentMax,
-                now = now,
-                deviceCount = deviceCount,
-                onCycleDevice = onCycleDevice,
-            )
-        }
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(0.dp),
+            autoCentering = AutoCenteringParams(itemIndex = 0),
+        ) {
+            // ── First item: fullscreen gauge with arcs ──
+            item {
+                GaugeFace(
+                    snapshot = snapshot,
+                    peakWatts = peakWatts,
+                    batteryCurrentMax = batteryCurrentMax,
+                    now = now,
+                    deviceCount = deviceCount,
+                    onCycleDevice = onCycleDevice,
+                    // A lazy list measures items with an unbounded height, so a plain
+                    // `fillMaxSize()` collapses to the content height and the arcs shrink to a
+                    // sliver. `fillParentMaxSize()` is the item-scope equivalent that knows the
+                    // viewport — and a first item exactly one viewport tall is what makes
+                    // auto-centering leave it flush with the top, so it can be scrolled fully
+                    // into view.
+                    modifier = Modifier.fillParentMaxSize(),
+                )
+            }
 
-        // ── Detail rows as Wear M3 Buttons ──
-        item {
-            DetailButton(
-                icon = Icons.Filled.BatteryChargingFull,
-                label = stringResource(R.string.label_battery),
-                value = Formatting.volts(values?.batteryVoltage),
-                valueColor = Color(VictronPalette.BATTERY),
-            )
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.WbSunny,
-                label = stringResource(R.string.label_pv),
-                value = Formatting.watts(values?.batteryPowerW),
-                valueColor = Color(VictronPalette.SOLAR),
-            )
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.PowerSettingsNew,
-                label = stringResource(R.string.label_state),
-                value = values?.chargerStateLabel ?: Formatting.PLACEHOLDER,
-                valueColor = if (values?.hasError == true) {
-                    Color(VictronPalette.ERROR)
-                } else {
-                    Color(VictronPalette.TEXT_DIM)
-                },
-            )
-        }
-        if (values?.hasError == true) {
+            // ── Why there is nothing to show, and what to do about it ──
+            if (status != null) {
+                item {
+                    Button(
+                        onClick = onStatusClick,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(VictronPalette.SURFACE),
+                        ),
+                    ) {
+                        Text(
+                            text = status,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(VictronPalette.TEXT),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+
+            // ── Detail rows as Wear M3 Buttons ──
             item {
                 DetailButton(
-                    icon = Icons.Filled.Warning,
-                    label = stringResource(R.string.label_error),
-                    value = values.chargerErrorLabel ?: "Err ${values.chargerErrorCode}",
-                    valueColor = Color(VictronPalette.ERROR),
+                    icon = Icons.Filled.BatteryChargingFull,
+                    label = stringResource(R.string.label_battery),
+                    value = Formatting.volts(values?.batteryVoltage),
+                    valueColor = Color(VictronPalette.BATTERY),
                 )
             }
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.WbSunny,
-                label = stringResource(R.string.label_yield_today),
-                value = Formatting.energy(values?.yieldTodayWh),
-                valueColor = Color(VictronPalette.YIELD),
-            )
-        }
-        if (values?.loadCurrent != null) {
             item {
                 DetailButton(
-                    icon = Icons.Filled.Settings,
-                    label = stringResource(R.string.label_load),
-                    value = Formatting.amps(values.loadCurrent),
-                    valueColor = Color(VictronPalette.TEXT),
+                    icon = Icons.Filled.WbSunny,
+                    label = stringResource(R.string.label_pv),
+                    value = Formatting.watts(values?.batteryPowerW),
+                    valueColor = Color(VictronPalette.SOLAR),
                 )
             }
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.Wifi,
-                label = stringResource(R.string.label_signal),
-                value = "${snapshot.rssi} dBm",
-                valueColor = Color(VictronPalette.TEXT_DIM),
-            )
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.Info,
-                label = stringResource(R.string.label_model),
-                value = snapshot.modelName,
-                valueColor = Color(VictronPalette.TEXT_DIM),
-            )
-        }
-        item {
-            DetailButton(
-                icon = Icons.Filled.Schedule,
-                label = stringResource(R.string.label_age),
-                value = Formatting.age(snapshot, now),
-                valueColor = Color(VictronPalette.TEXT_DIM),
-            )
+            item {
+                DetailButton(
+                    icon = Icons.Filled.PowerSettingsNew,
+                    label = stringResource(R.string.label_state),
+                    value = values?.chargerStateLabel ?: Formatting.PLACEHOLDER,
+                    valueColor = if (values?.hasError == true) {
+                        Color(VictronPalette.ERROR)
+                    } else {
+                        Color(VictronPalette.TEXT_DIM)
+                    },
+                )
+            }
+            if (values?.hasError == true) {
+                item {
+                    DetailButton(
+                        icon = Icons.Filled.Warning,
+                        label = stringResource(R.string.label_error),
+                        value = values.chargerErrorLabel ?: "Err ${values.chargerErrorCode}",
+                        valueColor = Color(VictronPalette.ERROR),
+                    )
+                }
+            }
+            item {
+                DetailButton(
+                    icon = Icons.Filled.WbSunny,
+                    label = stringResource(R.string.label_yield_today),
+                    value = Formatting.energy(values?.yieldTodayWh),
+                    valueColor = Color(VictronPalette.YIELD),
+                )
+            }
+            if (values?.loadCurrent != null) {
+                item {
+                    DetailButton(
+                        icon = Icons.Filled.Settings,
+                        label = stringResource(R.string.label_load),
+                        value = Formatting.amps(values.loadCurrent),
+                        valueColor = Color(VictronPalette.TEXT),
+                    )
+                }
+            }
+            item {
+                DetailButton(
+                    icon = Icons.Filled.Wifi,
+                    label = stringResource(R.string.label_signal),
+                    value = snapshot?.let { "${it.rssi} dBm" } ?: Formatting.PLACEHOLDER,
+                    valueColor = Color(VictronPalette.TEXT_DIM),
+                )
+            }
+            item {
+                DetailButton(
+                    icon = Icons.Filled.Info,
+                    label = stringResource(R.string.label_model),
+                    value = snapshot?.modelName ?: Formatting.PLACEHOLDER,
+                    valueColor = Color(VictronPalette.TEXT_DIM),
+                )
+            }
+            item {
+                DetailButton(
+                    icon = Icons.Filled.Schedule,
+                    label = stringResource(R.string.label_age),
+                    value = snapshot?.let { Formatting.age(it, now) } ?: Formatting.PLACEHOLDER,
+                    valueColor = Color(VictronPalette.TEXT_DIM),
+                )
+            }
+
+            // ── The one way out of this screen: device list, keys, settings, raw data ──
+            item {
+                Button(
+                    onClick = onOpenDevices,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.devices_title),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }
@@ -254,15 +294,16 @@ private fun GaugeList(
 /** The gauge face — arcs + large watts/amps. Extracted so previews reuse the real UI. */
 @Composable
 internal fun GaugeFace(
-    snapshot: DeviceSnapshot,
+    snapshot: DeviceSnapshot?,
     peakWatts: Int,
     batteryCurrentMax: Double,
     now: Long,
     deviceCount: Int = 1,
     onCycleDevice: () -> Unit = {},
+    modifier: Modifier = Modifier.fillMaxSize(),
 ) {
-    val values = snapshot.solarCharger
-    val stale = Formatting.isStale(snapshot, now)
+    val values = snapshot?.solarCharger
+    val stale = snapshot != null && Formatting.isStale(snapshot, now)
     val solar = if (stale) Color(VictronPalette.TEXT_DIM) else Color(VictronPalette.SOLAR)
     val currentColor = if (stale) {
         Color(VictronPalette.TEXT_DIM)
@@ -270,19 +311,17 @@ internal fun GaugeFace(
         Color(VictronPalette.currentColor(values?.batteryCurrent))
     }
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(VictronPalette.BACKGROUND)),
+        modifier = modifier.background(Color(VictronPalette.BACKGROUND)),
         contentAlignment = Alignment.Center,
     ) {
         PowerArc(
-            fraction = snapshot.pvFraction(peakWatts),
+            fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
             color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
         )
         PowerArc(
-            fraction = snapshot.batteryCurrentFraction(batteryCurrentMax),
+            fraction = snapshot?.batteryCurrentFraction(batteryCurrentMax) ?: 0f,
             color = currentColor,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
@@ -299,7 +338,11 @@ internal fun GaugeFace(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = if (deviceCount > 1) "${snapshot.displayName}  ›" else snapshot.displayName,
+                text = when {
+                    snapshot == null -> stringResource(R.string.overview_title)
+                    deviceCount > 1 -> "${snapshot.displayName}  ›"
+                    else -> snapshot.displayName
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = Color(VictronPalette.TEXT_DIM),
                 maxLines = 1,
@@ -356,7 +399,7 @@ internal fun GaugeFace(
             }
 
             Text(
-                text = Formatting.age(snapshot, now),
+                text = snapshot?.let { Formatting.age(it, now) } ?: Formatting.PLACEHOLDER,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(VictronPalette.TEXT_DIM),
                 modifier = Modifier.padding(top = 2.dp),
@@ -400,68 +443,6 @@ private fun DetailButton(icon: ImageVector, label: String, value: String, valueC
                 text = value,
                 style = MaterialTheme.typography.titleSmall,
                 color = valueColor,
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(scanning: Boolean, onOpenDevices: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .clickable(onClick = onOpenDevices),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = stringResource(if (scanning) R.string.scanning else R.string.empty_no_devices),
-            style = MaterialTheme.typography.titleSmall,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.empty_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(VictronPalette.TEXT_DIM),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun BlockedState(
-    reason: ScanUnavailable,
-    onGrantPermission: () -> Unit,
-    onOpenDevices: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .clickable {
-                if (reason == ScanUnavailable.NoPermission) onGrantPermission() else onOpenDevices()
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = when (reason) {
-                ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
-                ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
-                ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
-                is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        if (reason == ScanUnavailable.NoPermission) {
-            Text(
-                text = stringResource(R.string.permission_grant),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(VictronPalette.SOLAR),
-                modifier = Modifier.padding(top = 6.dp),
             )
         }
     }
