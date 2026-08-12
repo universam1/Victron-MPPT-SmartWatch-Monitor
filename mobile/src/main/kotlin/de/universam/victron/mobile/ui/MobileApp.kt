@@ -228,9 +228,11 @@ private fun SetupContent(
                     existingKey = config.keyFor(snapshot.address),
                     pvPeakWatts = config.pvPeakWattsFor(snapshot.address),
                     batteryCurrentMax = config.batteryCurrentMaxFor(snapshot.address),
+                    blePin = config.blePinFor(snapshot.address),
                     onSaveKey = { key -> viewModel.saveKey(snapshot.address, key) },
                     onSavePeak = { watts -> viewModel.setPvPeakWatts(snapshot.address, watts) },
                     onSaveBatteryMax = { amps -> viewModel.setBatteryCurrentMax(snapshot.address, amps) },
+                    onSavePin = { pin -> viewModel.setBlePin(snapshot.address, pin) },
                     onRemove = { viewModel.removeDevice(snapshot.address) },
                 )
             }
@@ -312,9 +314,11 @@ private fun DeviceCard(
     existingKey: String?,
     pvPeakWatts: Int,
     batteryCurrentMax: Double,
+    blePin: String,
     onSaveKey: (String) -> Boolean,
     onSavePeak: (Int) -> Unit,
     onSaveBatteryMax: (Double) -> Unit,
+    onSavePin: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
     var keyInput by rememberSaveable(snapshot.address, existingKey) {
@@ -326,6 +330,9 @@ private fun DeviceCard(
     }
     var batteryMaxInput by rememberSaveable(snapshot.address, batteryCurrentMax) {
         mutableStateOf(batteryCurrentMax.toInt().toString())
+    }
+    var pinInput by rememberSaveable(snapshot.address, blePin) {
+        mutableStateOf(blePin)
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -444,6 +451,19 @@ private fun DeviceCard(
                     supportingText = { Text(stringResource(R.string.battery_current_max_hint)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // BLE PIN code for GATT connections (load output control).
+                OutlinedTextField(
+                    value = pinInput,
+                    onValueChange = { input ->
+                        pinInput = input.filter { it.isDigit() }.take(10)
+                        if (pinInput.length >= 6) onSavePin(pinInput)
+                    },
+                    label = { Text(stringResource(R.string.ble_pin_label)) },
+                    supportingText = { Text(stringResource(R.string.ble_pin_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

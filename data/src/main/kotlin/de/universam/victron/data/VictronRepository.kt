@@ -244,11 +244,13 @@ public class VictronRepository internal constructor(
      * @return `true` if the read-back state matches [enabled], `false` on any failure.
      */
     public suspend fun setLoadOutput(address: String, enabled: Boolean): Boolean {
+        val pin = configStore.data.first().blePinFor(address)
         val value = if (enabled) VictronRegisters.LOAD_ALWAYS_ON else VictronRegisters.LOAD_ALWAYS_OFF
         val result = gatt.writeU8AndReadBack(
             address = address,
             register = VictronRegisters.LOAD_OUTPUT_CONTROL,
             value = value,
+            pin = pin,
         )
         val state = result?.asU8()
         Log.d(TAG, "setLoadOutput($address, $enabled) → state=$state")
@@ -257,7 +259,8 @@ public class VictronRepository internal constructor(
 
     /** Reads the current load output state (true=on, false=off, null=unknown). */
     public suspend fun getLoadOutputState(address: String): Boolean? {
-        val result = gatt.readRegister(address, VictronRegisters.LOAD_OUTPUT_STATE)
+        val pin = configStore.data.first().blePinFor(address)
+        val result = gatt.readRegister(address, VictronRegisters.LOAD_OUTPUT_STATE, pin = pin)
         return result?.asU8()?.let { it == 1 }
     }
 }

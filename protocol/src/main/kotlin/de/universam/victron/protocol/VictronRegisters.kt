@@ -17,21 +17,36 @@ public object VictronRegisters {
     // ---- GATT UUIDs -------------------------------------------------------------------------
 
     /**
-     * Victron BLE GATT service and characteristics.
+     * Victron SmartSolar BLE GATT services and characteristics.
      *
-     * From VictronConnect APK disassembly: the actual service is `68c10001-...`, NOT
-     * `6597xxxx-...` (which is only documented for SmartShunts in community projects).
+     * The SmartSolar uses THREE services:
+     * - `68c10001-...` — VE.Direct Smart (PIN code, device info)
+     * - `97580001-...` — vendor service (unknown purpose)
+     * - `306b0001-...` — **data service** (register reads/writes go here)
+     *
+     * Within the data service, three characteristics carry all traffic:
+     * - `306b0002` (handle 0x0021) — control: handshake + keepalive
+     * - `306b0003` (handle 0x0024) — single-value register messages
+     * - `306b0004` (handle 0x0027) — bulk/streaming register messages
      */
-    public val SERVICE_UUID: UUID =
+    public val DATA_SERVICE_UUID: UUID =
+        UUID.fromString("306b0001-b081-4037-83dc-e59fcc3cdfd0")
+
+    /** Control characteristic — handshake + keepalive (handle 0x0021). */
+    public val CONTROL_UUID: UUID =
+        UUID.fromString("306b0002-b081-4037-83dc-e59fcc3cdfd0")
+
+    /** Single-value characteristic — register read/write (handle 0x0024). */
+    public val SINGLE_VALUE_UUID: UUID =
+        UUID.fromString("306b0003-b081-4037-83dc-e59fcc3cdfd0")
+
+    /** Bulk/streaming characteristic — multi-register ops (handle 0x0027). */
+    public val BULK_UUID: UUID =
+        UUID.fromString("306b0004-b081-4037-83dc-e59fcc3cdfd0")
+
+    /** VE.Direct Smart service — PIN code auth + device info. */
+    public val VE_DIRECT_SERVICE_UUID: UUID =
         UUID.fromString("68c10001-b17f-4d3a-a290-34ad6499937c")
-
-    /** Write characteristic — TX to device. */
-    public val WRITE_UUID: UUID =
-        UUID.fromString("68c10002-b17f-4d3a-a290-34ad6499937c")
-
-    /** Notify characteristic — RX from device. */
-    public val NOTIFY_UUID: UUID =
-        UUID.fromString("68c10003-b17f-4d3a-a290-34ad6499937c")
 
     // ---- Register IDs -----------------------------------------------------------------------
 

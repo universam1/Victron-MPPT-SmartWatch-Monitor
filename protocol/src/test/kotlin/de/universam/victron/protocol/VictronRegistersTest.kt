@@ -66,18 +66,18 @@ class VictronRegistersTest {
     }
 
     @Test
-    fun `service UUID is the Victron BLE service`() {
-        assertEquals("68c10001-b17f-4d3a-a290-34ad6499937c", VictronRegisters.SERVICE_UUID.toString())
+    fun `data service UUID is the SmartSolar 306b0001 service`() {
+        assertEquals("306b0001-b081-4037-83dc-e59fcc3cdfd0", VictronRegisters.DATA_SERVICE_UUID.toString())
     }
 
     @Test
-    fun `write UUID is characteristic 68c10002`() {
-        assertEquals("68c10002-b17f-4d3a-a290-34ad6499937c", VictronRegisters.WRITE_UUID.toString())
+    fun `single value UUID is characteristic 306b0003`() {
+        assertEquals("306b0003-b081-4037-83dc-e59fcc3cdfd0", VictronRegisters.SINGLE_VALUE_UUID.toString())
     }
 
     @Test
-    fun `notify UUID is characteristic 68c10003`() {
-        assertEquals("68c10003-b17f-4d3a-a290-34ad6499937c", VictronRegisters.NOTIFY_UUID.toString())
+    fun `control UUID is characteristic 306b0002`() {
+        assertEquals("306b0002-b081-4037-83dc-e59fcc3cdfd0", VictronRegisters.CONTROL_UUID.toString())
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

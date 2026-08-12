@@ -134,6 +134,14 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         }
     }
 
+    /** Stores the BLE PIN code used for GATT connections (load output control). */
+    public fun setBlePin(address: String, pin: String) {
+        val existing = config.value.deviceFor(address) ?: return
+        viewModelScope.launch {
+            repository.upsertDevice(existing.copy(blePin = pin))
+        }
+    }
+
     /**
      * Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly.
      *

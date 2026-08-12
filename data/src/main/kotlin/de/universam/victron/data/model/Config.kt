@@ -20,6 +20,8 @@ public data class DeviceConfig(
     val pvPeakWatts: Int = 0,
     /** Full scale of the battery current arc in amps. Default 15 A. */
     val batteryCurrentMax: Double = 15.0,
+    /** BLE PIN code for GATT connections (load output control). Default `000000`. */
+    val blePin: String = "000000",
     /** When this entry was last changed, used to resolve phone/watch sync conflicts. */
     val updatedAtEpochMillis: Long = 0,
 )
@@ -47,6 +49,8 @@ public data class AppConfig(
     public fun pvPeakWattsFor(address: String): Int = deviceFor(address)?.pvPeakWatts ?: 0
 
     public fun batteryCurrentMaxFor(address: String): Double = deviceFor(address)?.batteryCurrentMax ?: 15.0
+
+    public fun blePinFor(address: String): String = deviceFor(address)?.blePin ?: "000000"
 
     public val tileAddresses: List<String>
         get() = devices.filter { it.showOnTile }.map { it.address }

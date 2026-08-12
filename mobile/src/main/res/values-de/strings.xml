@@ -33,6 +33,9 @@
     <string name="battery_current_max_label">Max. Batteriestrom in A</string>
     <string name="battery_current_max_hint">Skalenende des Strom-Bogens. Standard: 15 A.</string>
 
+    <string name="ble_pin_label">BLE-PIN-Code</string>
+    <string name="ble_pin_hint">PIN für GATT-Verbindung (Lastausgang-Steuerung). Standard: 000000.</string>
+
     <string name="status_missing_key">Noch kein Schlüssel</string>
     <string name="status_key_mismatch">Schlüssel passt nicht zu diesem Gerät</string>
     <string name="status_undecoded">Record-Typ noch nicht unterstützt</string>
