@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
@@ -40,6 +41,9 @@ private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 /**
  * Horizontal animated bar gauge for battery current. Green when charging, orange when discharging,
  * dimmed when stale. Includes a glow layer and vertical gradient for depth, plus optional sparkline.
+ *
+ * [sparklineHeight] trades trend detail for vertical space — a landscape layout has less of the
+ * latter than a portrait one.
  */
 @Composable
 fun CurrentBar(
@@ -47,6 +51,7 @@ fun CurrentBar(
     stale: Boolean,
     modifier: Modifier = Modifier,
     sparklineValues: List<Float> = emptyList(),
+    sparklineHeight: Dp = 72.dp,
 ) {
     val fraction = ((abs(amps ?: 0.0) / MAX_AMPS).coerceIn(0.0, 1.0)).toFloat()
     val animated by animateFloatAsState(
@@ -83,14 +88,14 @@ fun CurrentBar(
             )
         }
 
-        // Sparkline above the bar — double height for prominence
+        // Sparkline above the bar — generous height for prominence
         if (sparklineValues.size >= 2) {
             Sparkline(
                 values = sparklineValues,
                 color = barColor,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(sparklineHeight),
             )
         }
 

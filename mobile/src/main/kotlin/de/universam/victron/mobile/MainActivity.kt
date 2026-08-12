@@ -3,6 +3,7 @@ package de.universam.victron.mobile
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -15,6 +16,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Edge-to-edge is enforced from targetSdk 35 anyway; declaring it keeps the behaviour the
+        // same on older devices. The screens inset their own content via `safeDrawingPadding`, so
+        // the dashboard gradient can run behind the bars while nothing important hides under them.
+        enableEdgeToEdge()
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(

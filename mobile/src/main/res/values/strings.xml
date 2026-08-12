@@ -49,4 +49,5 @@
     <string name="dashboard_view">Dashboard</string>
     <string name="label_battery_current">Battery Current</string>
     <string name="label_voltage">Voltage</string>
+    <string name="gauge_of_scale">of %1$d W</string>
 </resources>

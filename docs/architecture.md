@@ -124,6 +124,28 @@ The arc's full scale is the array size if you configured one (phone app), otherw
 power ever seen from that device, rounded up to a step a human would draw — with a 50 W floor, so
 3 W on a dark morning does not look like a full array.
 
+## Phone UI
+
+The dashboard follows the *shape of the window*, not the orientation sensor: `DeviceDashboard`
+measures itself with `BoxWithConstraints` and switches arrangement when `maxWidth > maxHeight`.
+
+* **Taller than wide** — one scrolling column: arc gauge at full width, current bar, 2×2 tiles.
+* **Wider than tall** — two columns: the header spans the top, the arc gauge sits left sized to the
+  *height* (`PvArcGauge(matchHeightFirst = true)`), the current bar and the tiles sit right in a
+  compact variant. That is the difference between a landscape layout and a magnified portrait one:
+  deriving the square gauge from the abundant width pushes everything else off screen.
+
+Header, tiles and gauge are single composables shared by both arrangements (`DashboardHeader`,
+`ValueTiles`, `PvArcGauge`), so the two paths cannot drift apart. `PvArcGauge` scales its own type
+to the resolved diameter and always draws a circle centred in the box it is given.
+
+The app is edge-to-edge (`enableEdgeToEdge`); the dashboard gradient runs behind the system bars
+while the content is inset with `safeDrawingPadding`, which is what keeps the gauge and the setup
+button clear of a landscape navigation bar or a display cutout. The setup form is capped at 560 dp
+and centred — a 32 character key field stretched across a landscape phone is unreadable. Screen
+choice and typed input use `rememberSaveable`, so a rotation does not throw you back to setup or
+wipe a half-entered key.
+
 ## Permissions
 
 Only one runtime permission: `BLUETOOTH_SCAN`, declared with

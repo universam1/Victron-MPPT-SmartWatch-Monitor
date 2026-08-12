@@ -77,6 +77,13 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   nullable snapshot: no device means `–` everywhere and arcs at zero, never a fake `0 W`, and every
   navigation affordance stays reachable — that is what lets the UI be checked without a Victron in
   range. Do not put them back behind an "empty state" that replaces the screen.
+- **The phone dashboard is laid out by window shape, not orientation** (`BoxWithConstraints`,
+  `maxWidth > maxHeight`): one scrolling column when tall, two columns with a height-sized gauge
+  (`PvArcGauge(matchHeightFirst = true)`) when wide. Both arrangements call the *same*
+  `DashboardHeader`/`ValueTiles`/`PvArcGauge` — don't fork them into two layouts that drift.
+  Deriving the square gauge from the width in landscape is the bug this replaced.
+- **The phone app is edge-to-edge**: gradients may run behind the system bars, content must be
+  inset (`safeDrawingPadding`), or a landscape navigation bar and display cutouts clip it.
 - **The hero gauge item is sized with `Modifier.fillParentMaxSize()`** (the `ScalingLazyListItemScope`
   one). A lazy list measures items with an unbounded height, so `fillMaxSize()` there collapses to the
   content height, the bezel arcs shrink to a sliver, and auto-centering pushes the gauge below the top

@@ -7,12 +7,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,10 +58,11 @@ import kotlinx.coroutines.delay
 
 private const val BLUETOOTH_SCAN = android.Manifest.permission.BLUETOOTH_SCAN
 
-private sealed interface Screen {
-    data object Dashboard : Screen
-    data object Setup : Screen
-}
+/** Widest the setup form gets — beyond this a text field is just a long line to read. */
+private val MAX_FORM_WIDTH = 560.dp
+
+/** Enum rather than a sealed hierarchy so `rememberSaveable` can carry it through a rotation. */
+private enum class Screen { Dashboard, Setup }
 
 /**
  * Phone side of the same app: identical data, identical scanning, but with room for a text field
@@ -84,9 +89,10 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
         }
     }
 
-    // Auto-navigate to dashboard when decoded devices exist (fires once).
-    var screen by remember { mutableStateOf<Screen>(Screen.Setup) }
-    var hasAutoNavigated by remember { mutableStateOf(false) }
+    // Auto-navigate to dashboard when decoded devices exist (fires once). Saved, not just
+    // remembered: a rotation recreates the Activity and must not throw the user back to setup.
+    var screen by rememberSaveable { mutableStateOf(Screen.Setup) }
+    var hasAutoNavigated by rememberSaveable { mutableStateOf(false) }
     val hasDecoded = snapshots.any { it.status == SnapshotStatus.DECODED }
 
     LaunchedEffect(hasDecoded) {
@@ -137,134 +143,141 @@ private fun SetupContent(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) viewModel.retryScan() }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    // A form stretched across a landscape phone is unreadable, so the content keeps a sane
+    // measure and centres in whatever width is left.
+    Box(
+        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.devices),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
+        LazyColumn(
+            modifier = Modifier.widthIn(max = MAX_FORM_WIDTH).fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (scanState == ScanState.Scanning) {
-                        Text(
-                            text = stringResource(R.string.scanning),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    OutlinedButton(onClick = onOpenDashboard) {
-                        Text(stringResource(R.string.dashboard_view))
+                    Text(
+                        text = stringResource(R.string.devices),
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (scanState == ScanState.Scanning) {
+                            Text(
+                                text = stringResource(R.string.scanning),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        OutlinedButton(onClick = onOpenDashboard) {
+                            Text(stringResource(R.string.dashboard_view))
+                        }
                     }
                 }
             }
-        }
 
-        (scanState as? ScanState.Unavailable)?.let { unavailable ->
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = when (val reason = unavailable.reason) {
-                                ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
-                                ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
-                                ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
-                                is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
-                            },
-                        )
-                        if (unavailable.reason == ScanUnavailable.NoPermission) {
-                            Button(onClick = { permissionLauncher.launch(BLUETOOTH_SCAN) }) {
-                                Text(stringResource(R.string.permission_grant))
+            (scanState as? ScanState.Unavailable)?.let { unavailable ->
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = when (val reason = unavailable.reason) {
+                                    ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
+                                    ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
+                                    ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
+                                    is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
+                                },
+                            )
+                            if (unavailable.reason == ScanUnavailable.NoPermission) {
+                                Button(onClick = { permissionLauncher.launch(BLUETOOTH_SCAN) }) {
+                                    Text(stringResource(R.string.permission_grant))
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        if (snapshots.isEmpty()) {
-            item {
-                Text(
-                    text = stringResource(R.string.empty_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        items(snapshots, key = { it.address }) { snapshot ->
-            DeviceCard(
-                snapshot = snapshot,
-                now = now,
-                existingKey = config.keyFor(snapshot.address),
-                pvPeakWatts = config.pvPeakWattsFor(snapshot.address),
-                batteryCurrentMax = config.batteryCurrentMaxFor(snapshot.address),
-                onSaveKey = { key -> viewModel.saveKey(snapshot.address, key) },
-                onSavePeak = { watts -> viewModel.setPvPeakWatts(snapshot.address, watts) },
-                onSaveBatteryMax = { amps -> viewModel.setBatteryCurrentMax(snapshot.address, amps) },
-                onRemove = { viewModel.removeDevice(snapshot.address) },
-            )
-        }
-
-        item { HorizontalDivider() }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(R.string.sync_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = stringResource(R.string.sync_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = { viewModel.syncNow() }) {
-                    Text(stringResource(R.string.sync_now))
+            if (snapshots.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.empty_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-        }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.background_scan))
-                Switch(
-                    checked = config.backgroundScanEnabled,
-                    onCheckedChange = { viewModel.setBackgroundScanEnabled(it) },
+            items(snapshots, key = { it.address }) { snapshot ->
+                DeviceCard(
+                    snapshot = snapshot,
+                    now = now,
+                    existingKey = config.keyFor(snapshot.address),
+                    pvPeakWatts = config.pvPeakWattsFor(snapshot.address),
+                    batteryCurrentMax = config.batteryCurrentMaxFor(snapshot.address),
+                    onSaveKey = { key -> viewModel.saveKey(snapshot.address, key) },
+                    onSavePeak = { watts -> viewModel.setPvPeakWatts(snapshot.address, watts) },
+                    onSaveBatteryMax = { amps -> viewModel.setBatteryCurrentMax(snapshot.address, amps) },
+                    onRemove = { viewModel.removeDevice(snapshot.address) },
                 )
             }
-        }
 
-        item {
-            OutlinedButton(onClick = { viewModel.requestScanNow() }) {
-                Text(stringResource(R.string.scan_now))
+            item { HorizontalDivider() }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.sync_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.sync_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = { viewModel.syncNow() }) {
+                        Text(stringResource(R.string.sync_now))
+                    }
+                }
             }
-        }
 
-        item {
-            val context = LocalContext.current
-            val version = context.packageManager
-                .getPackageInfo(context.packageName, 0).versionName ?: ""
-            Text(
-                text = "v$version",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 16.dp),
-            )
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.background_scan))
+                    Switch(
+                        checked = config.backgroundScanEnabled,
+                        onCheckedChange = { viewModel.setBackgroundScanEnabled(it) },
+                    )
+                }
+            }
+
+            item {
+                OutlinedButton(onClick = { viewModel.requestScanNow() }) {
+                    Text(stringResource(R.string.scan_now))
+                }
+            }
+
+            item {
+                val context = LocalContext.current
+                val version = context.packageManager
+                    .getPackageInfo(context.packageName, 0).versionName ?: ""
+                Text(
+                    text = "v$version",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
         }
     }
 }
@@ -281,12 +294,14 @@ private fun DeviceCard(
     onSaveBatteryMax: (Double) -> Unit,
     onRemove: () -> Unit,
 ) {
-    var keyInput by remember(snapshot.address, existingKey) { mutableStateOf(existingKey.orEmpty()) }
-    var invalid by remember { mutableStateOf(false) }
-    var peakInput by remember(snapshot.address, pvPeakWatts) {
+    var keyInput by rememberSaveable(snapshot.address, existingKey) {
+        mutableStateOf(existingKey.orEmpty())
+    }
+    var invalid by rememberSaveable { mutableStateOf(false) }
+    var peakInput by rememberSaveable(snapshot.address, pvPeakWatts) {
         mutableStateOf(if (pvPeakWatts > 0) pvPeakWatts.toString() else "")
     }
-    var batteryMaxInput by remember(snapshot.address, batteryCurrentMax) {
+    var batteryMaxInput by rememberSaveable(snapshot.address, batteryCurrentMax) {
         mutableStateOf(batteryCurrentMax.toInt().toString())
     }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -62,45 +63,50 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(bgBrush),
     ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
-            if (page < devicePages) {
-                val snapshot = decoded.getOrNull(page)
-                DeviceDashboard(
-                    snapshot = snapshot,
-                    peakWatts = snapshot?.let { config.pvPeakWattsFor(it.address) } ?: 0,
-                    now = now,
-                    modifier = Modifier.fillMaxSize(),
-                    history = snapshot?.let { history[it.address.uppercase()] },
-                    // Always-available way into setup, so navigation never depends on finding a
-                    // device first.
-                    onOpenSetup = onOpenSetup,
-                )
-            } else {
-                // Empty placeholder — LaunchedEffect navigates away immediately
-                Box(modifier = Modifier.fillMaxSize())
-            }
-        }
-
-        // Page indicators (only device pages, not the settings trigger)
-        if (decoded.size > 1) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                repeat(decoded.size) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (index == pagerState.currentPage) SOLAR else TRACK,
-                            ),
+        // The gradient stays full-bleed behind the system bars; the content does not. In landscape
+        // that is what keeps the gauge and the gear button clear of the navigation bar and a
+        // display cutout.
+        Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                if (page < devicePages) {
+                    val snapshot = decoded.getOrNull(page)
+                    DeviceDashboard(
+                        snapshot = snapshot,
+                        peakWatts = snapshot?.let { config.pvPeakWattsFor(it.address) } ?: 0,
+                        now = now,
+                        modifier = Modifier.fillMaxSize(),
+                        history = snapshot?.let { history[it.address.uppercase()] },
+                        // Always-available way into setup, so navigation never depends on finding a
+                        // device first.
+                        onOpenSetup = onOpenSetup,
                     )
+                } else {
+                    // Empty placeholder — LaunchedEffect navigates away immediately
+                    Box(modifier = Modifier.fillMaxSize())
+                }
+            }
+
+            // Page indicators (only device pages, not the settings trigger)
+            if (decoded.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    repeat(decoded.size) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (index == pagerState.currentPage) SOLAR else TRACK,
+                                ),
+                        )
+                    }
                 }
             }
         }

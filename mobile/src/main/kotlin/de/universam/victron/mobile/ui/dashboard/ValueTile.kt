@@ -35,6 +35,9 @@ private val TEXT_PRIMARY = Color(VictronPalette.TEXT)
  * A compact card showing one metric: a colored accent strip on the left, a dim label with icon,
  * and a large value. Gradient background and faint accent wash give depth. Optional sparkline
  * drawn behind.
+ *
+ * [compact] trims the padding and type so a column of tiles fits the height of a landscape phone
+ * without scrolling.
  */
 @Composable
 fun ValueTile(
@@ -45,6 +48,7 @@ fun ValueTile(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     sparklineValues: List<Float> = emptyList(),
+    compact: Boolean = false,
 ) {
     val activeAccent = if (stale) TEXT_DIM else accentColor
     val bgBrush = Brush.verticalGradient(
@@ -65,7 +69,7 @@ fun ValueTile(
                 color = activeAccent,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(if (compact) 28.dp else 40.dp)
                     .align(Alignment.BottomCenter),
             )
         }
@@ -82,7 +86,12 @@ fun ValueTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 16.dp, end = 14.dp, top = 16.dp, bottom = 16.dp),
+                .padding(
+                    start = if (compact) 12.dp else 16.dp,
+                    end = if (compact) 10.dp else 14.dp,
+                    top = if (compact) 10.dp else 16.dp,
+                    bottom = if (compact) 10.dp else 16.dp,
+                ),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (icon != null) {
@@ -101,7 +110,7 @@ fun ValueTile(
             }
             Text(
                 text = value,
-                fontSize = 22.sp,
+                fontSize = if (compact) 18.sp else 22.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (stale) TEXT_DIM else TEXT_PRIMARY,
                 modifier = Modifier.padding(top = 2.dp),
