@@ -21,8 +21,11 @@
     <string name="background_scan">Hintergrund-Scan (~15 min)</string>
 
     <string name="sync_title">Uhr</string>
-    <string name="sync_hint">Geräte und Schlüssel werden automatisch mit der gekoppelten Uhr synchronisiert. Beide Apps müssen aus demselben Build stammen.</string>
+    <string name="sync_hint">Schlüssel und Einstellungen werden automatisch synchronisiert. Dieser Button erzwingt einen sofortigen Abgleich.</string>
     <string name="sync_now">Jetzt zur Uhr synchronisieren</string>
+    <string name="sync_syncing">Synchronisiere…</string>
+    <string name="sync_done">✓ %1$d Gerät(e) synchronisiert</string>
+    <string name="sync_failed">✗ Sync fehlgeschlagen</string>
 
     <string name="pv_peak_label">Modulleistung in W (optional)</string>
     <string name="pv_peak_hint">Skalenende der Anzeige. Leer = höchste bisher gesehene Leistung.</string>

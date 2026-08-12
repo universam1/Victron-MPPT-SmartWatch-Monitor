@@ -21,8 +21,11 @@
     <string name="background_scan">Background scan (~15 min)</string>
 
     <string name="sync_title">Watch</string>
-    <string name="sync_hint">Devices and keys are synced to the paired watch automatically. Both apps must be installed from the same build.</string>
+    <string name="sync_hint">Keys and settings sync automatically when changed. This button forces an immediate exchange.</string>
     <string name="sync_now">Sync to watch now</string>
+    <string name="sync_syncing">Syncing…</string>
+    <string name="sync_done">✓ %1$d device(s) synced</string>
+    <string name="sync_failed">✗ Sync failed</string>
 
     <string name="pv_peak_label">Array size in W (optional)</string>
     <string name="pv_peak_hint">Full scale of the gauge. Empty = highest power seen so far.</string>

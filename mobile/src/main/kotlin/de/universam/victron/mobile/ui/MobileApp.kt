@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import de.universam.victron.data.Formatting
 import de.universam.victron.data.ScanState
 import de.universam.victron.data.ScanUnavailable
+import de.universam.victron.data.SyncResult
 import de.universam.victron.data.VictronViewModel
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceSnapshot
@@ -241,8 +242,24 @@ private fun SetupContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(onClick = { viewModel.syncNow() }) {
-                        Text(stringResource(R.string.sync_now))
+                    val syncState = viewModel.syncState.collectAsStateWithLifecycle().value
+                    OutlinedButton(
+                        onClick = { viewModel.syncNow() },
+                        enabled = syncState !is SyncResult.Syncing,
+                    ) {
+                        Text(
+                            text = when (syncState) {
+                                is SyncResult.Syncing -> stringResource(R.string.sync_syncing)
+                                is SyncResult.Done -> stringResource(R.string.sync_done, syncState.deviceCount)
+                                is SyncResult.Failed -> stringResource(R.string.sync_failed)
+                                else -> stringResource(R.string.sync_now)
+                            },
+                            color = when (syncState) {
+                                is SyncResult.Done -> MaterialTheme.colorScheme.primary
+                                is SyncResult.Failed -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                        )
                     }
                 }
             }

@@ -12,6 +12,7 @@ import de.universam.victron.data.model.SnapshotStatus
 import de.universam.victron.protocol.VictronCipher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,14 @@ public sealed interface ScanState {
     public data class Unavailable(val reason: ScanUnavailable) : ScanState
 }
 
+/** Result of a manual sync operation. */
+public sealed interface SyncResult {
+    public data object Idle : SyncResult
+    public data object Syncing : SyncResult
+    public data class Done(val deviceCount: Int) : SyncResult
+    public data class Failed(val message: String) : SyncResult
+}
+
 /**
  * Shared between the watch app and the phone app — both show the same data and offer the same
  * actions, so there is exactly one place where scanning and configuration live.
@@ -38,6 +47,9 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
 
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
     public val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
+
+    private val _syncState = MutableStateFlow<SyncResult>(SyncResult.Idle)
+    public val syncState: StateFlow<SyncResult> = _syncState.asStateFlow()
 
     /** Devices sorted so the useful ones come first: decoded, then discovered, then stale. */
     public val snapshots: StateFlow<List<DeviceSnapshot>> = repository.snapshots
@@ -69,7 +81,18 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
 
     /** Exchanges the device list with the paired phone/watch right now. */
     public fun syncNow() {
-        viewModelScope.launch { repository.syncNow() }
+        viewModelScope.launch {
+            _syncState.value = SyncResult.Syncing
+            try {
+                repository.syncNow()
+                val count = config.value.devices.size
+                _syncState.value = SyncResult.Done(count)
+            } catch (e: Exception) {
+                _syncState.value = SyncResult.Failed(e.message ?: "Unknown error")
+            }
+            delay(2_000)
+            _syncState.value = SyncResult.Idle
+        }
     }
 
     /** Full scale of the power arc in watts; `0` derives it from the highest power seen. */
