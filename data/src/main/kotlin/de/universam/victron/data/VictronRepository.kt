@@ -254,7 +254,8 @@ public class VictronRepository internal constructor(
     /** Reads the current load output mode (4=always on, 1=auto, null=unknown). */
     public suspend fun getLoadOutputState(address: String): Boolean? {
         val pin = configStore.data.first().blePinFor(address)
-        val mode = gatt.getLoadOutputMode(address, pin = pin)
-        return mode?.let { it == VictronRegisters.LOAD_ALWAYS_ON }
+        val registerValue = gatt.getLoadOutputMode(address, pin = pin)
+        // The register carries the streetlight flag in bit 7, so compare the mode part only.
+        return registerValue?.let { VictronRegisters.loadMode(it) == VictronRegisters.LOAD_ALWAYS_ON }
     }
 }
