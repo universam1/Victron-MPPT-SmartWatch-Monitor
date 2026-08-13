@@ -15,3 +15,8 @@ keystore.properties
 .env
 dist/
 !gradle/wrapper/gradle-wrapper.jar
+
+# Reverse-engineering scratch: pulled APKs, the extracted native library, symbol tables and
+# Victron's own product/firmware data. Regenerate with tools/victron-re/pull-apk.sh —
+# this repo is public and none of that is ours to publish.
+tools/victron-re/work/
