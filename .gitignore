@@ -16,7 +16,10 @@ keystore.properties
 dist/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Reverse-engineering scratch: pulled APKs, the extracted native library, symbol tables and
-# Victron's own product/firmware data. Regenerate with tools/victron-re/pull-apk.sh —
-# this repo is public and none of that is ours to publish.
-tools/victron-re/work/
+# Reverse-engineering artifacts are committed while this repo is private, so the blanket
+# *.apk rule above must not swallow the pulled APKs. See tools/victron-re/README.md —
+# these must come back OUT of history before the repo is made public again.
+!tools/victron-re/work/**
+
+# The extracted native library is 103 MB, over GitHub's 100 MB hard limit, so it stays local.
+tools/victron-re/work/lib/

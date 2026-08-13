@@ -10,13 +10,42 @@ and the protocol logic is compiled ARM64. The library ships **unstripped**, so C
 names survive and the protocol constants are readable as plain immediates. That is what made
 this tractable without a decompiler.
 
-## Nothing extracted is committed
+## ⚠ Before making this repository public again
 
-`work/` is gitignored. This repository is public, so it holds only our own scripts and the
-*protocol facts* we established. It deliberately does not carry the APK, the extracted
-library, Victron's product-definition XML, or the firmware blocks embedded in it — that
-material is theirs, and publishing it is a different act from analysing a copy you already
-own. Pull your own from your own device.
+`work/` **is committed** while the repo is private, so the analysis inputs travel with it.
+Some of that material is Victron's, not ours:
+
+| Artifact | Contains |
+|---|---|
+| `work/base.apk` | Their app build (DEX + Qt resource bundle) |
+| `work/product_defs.xml` | Their product definition for `0xA05F`, **including 616 blocks of encrypted firmware** |
+| `work/allsyms.txt`, `work/vesmart_syms.txt` | Verbatim symbol/address dumps from their binary |
+
+Analysing a copy you own is one thing; publishing it is another. **Git history is permanent**,
+so flipping the repo public re-publishes every one of these from history even if the files are
+deleted in a later commit. Removing them properly means rewriting history:
+
+```sh
+git filter-repo --path tools/victron-re/work --invert-paths   # then force-push
+```
+
+Do that *before* the repo goes public, not after — once it is public, forks and mirrors have
+their own copies. The scripts here are ours and can stay.
+
+## The native library is not committed
+
+`work/lib/` is gitignored. `libVictronConnect_arm64-v8a.so` is 103 MB, over GitHub's 100 MB
+per-file hard limit, and it lives in `split_config.arm64_v8a.apk` (107 MB) — which is over the
+limit too. `base.apk` does **not** contain it; it has only `classes*.dex` and `assets/`.
+
+So the committed APK is not sufficient to regenerate the symbol tables. To disassemble
+anything you need the phone again:
+
+```sh
+./pull-apk.sh && ./symbols.sh
+```
+
+If you want the library itself under version control, Git LFS is the only practical route.
 
 ## Requirements
 
@@ -34,6 +63,11 @@ through capstone rather than binutils.
 ./symbols.sh      # extract the .so, build the symbol tables
 python3 disasm.py sym setPathValues
 ```
+
+`work/product_defs.xml` is the already-extracted product definition for model `41055`
+(`0xA05F`, SmartSolar MPPT 100/20) — the `<vregs>` section is the register map the protocol
+doc's load-output table came from. It was sliced out of the `.so` by byte offset, since
+`strings` truncates at NULs.
 
 `disasm.py sym <pattern>` disassembles every function whose mangled name contains the
 pattern, annotating branch targets with symbol names and `adrp`/`add` pairs with the string
