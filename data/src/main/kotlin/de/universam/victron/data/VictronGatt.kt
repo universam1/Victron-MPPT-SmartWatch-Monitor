@@ -15,8 +15,10 @@ import de.universam.victron.protocol.VeSmartProtocol
 import de.universam.victron.protocol.VictronRegisters
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 /**
@@ -48,98 +50,50 @@ public class VictronGatt(context: Context) {
         pin: String = "000000",
         timeoutMs: Long = TIMEOUT_MS,
     ): Boolean = withGatt(address, pin, timeoutMs) { session ->
-        // Step 1: ReadyToReceive — tell device we can accept responses
-        Log.d(TAG, "Step 1: sending ReadyToReceive")
-        session.writeControl(VeSmartProtocol.encodeReadyToReceive()) ?: run {
-            Log.w(TAG, "Step 1 failed: writeControl(ReadyToReceive) returned null")
-            return@withGatt false
-        }
-        delay(100)
+        val load = session.findLoadRegister() ?: return@withGatt false
 
-        // Step 2: GetDevices — discover device instances
-        Log.d(TAG, "Step 2: sending GetDevices")
-        session.writeControl(VeSmartProtocol.encodeGetDevices()) ?: run {
-            Log.w(TAG, "Step 2 failed: writeControl(GetDevices) returned null")
-            return@withGatt false
-        }
-        Log.d(TAG, "Step 2: awaiting data notification")
-        val devicesResponse = session.awaitDataNotification() ?: run {
-            Log.w(TAG, "Step 2 failed: awaitDataNotification (GetDevices) timed out")
-            return@withGatt false
-        }
-        Log.d(TAG, "Step 2: got devices response: ${devicesResponse.toHex()}")
-        // For single-device setups, instanceId is typically 0
-        val instanceId = 0
-
-        // Step 3: GetPathList — get path→index mapping
-        Log.d(TAG, "Step 3: sending GetPathList(instance=$instanceId)")
-        session.writeControl(VeSmartProtocol.encodeGetPathList(instanceId)) ?: run {
-            Log.w(TAG, "Step 3 failed: writeControl(GetPathList) returned null")
-            return@withGatt false
-        }
-        Log.d(TAG, "Step 3: awaiting data notification")
-        val pathListResponse = session.awaitDataNotification() ?: run {
-            Log.w(TAG, "Step 3 failed: awaitDataNotification (GetPathList) timed out")
-            return@withGatt false
-        }
-        Log.d(TAG, "Step 3: got path list response: ${pathListResponse.toHex()}")
-        val paths = VeSmartProtocol.parsePathList(pathListResponse)
-        Log.d(TAG, "Step 3: parsed paths = $paths")
-
-        val loadPathIndex = paths[VictronRegisters.PATH_LOAD_OPERATION_MODE]
-        if (loadPathIndex == null) {
-            Log.w(TAG, "Device does not expose ${VictronRegisters.PATH_LOAD_OPERATION_MODE}")
-            return@withGatt false
+        // The mode shares its register with the streetlight flag, so carry that bit over
+        // rather than clearing it.
+        val target = VictronRegisters.loadValuePreservingFlags(value, load.currentValue)
+        Log.d(TAG, "load register on instance ${load.instance}: ${load.currentValue} -> $target")
+        if (target == load.currentValue) {
+            Log.d(TAG, "already $target, nothing to write")
+            return@withGatt true
         }
 
-        // Step 4: SetPathValue — write the load output mode
-        Log.d(TAG, "Step 4: SetPathValue(instance=$instanceId, pathIndex=$loadPathIndex, value=$value)")
-        val setMsg = VeSmartProtocol.encodeSetPathValue(instanceId, loadPathIndex, value)
-        session.writeData(setMsg) ?: run {
-            Log.w(TAG, "Step 4 failed: writeData(SetPathValue) returned null")
-            return@withGatt false
+        // VictronConnect has two write encodings (see encodeSetRegister); try the one the
+        // settings UI uses first and fall back rather than failing outright.
+        for (asByteString in listOf(false, true)) {
+            val frame = VeSmartProtocol.encodeSetRegister(
+                instance = load.instance,
+                register = VictronRegisters.LOAD_OUTPUT_CONTROL,
+                value = target,
+                asByteString = asByteString,
+            )
+            Log.d(TAG, "SetValues (byteString=$asByteString): ${frame.toHex()}")
+            session.writeData(frame) ?: return@withGatt false
+
+            val readBack = session.readRegister(load.instance, VictronRegisters.LOAD_OUTPUT_CONTROL)
+            if (readBack == target) {
+                Log.d(TAG, "load register confirmed as $readBack")
+                return@withGatt true
+            }
+            Log.w(TAG, "write not confirmed (read back $readBack, wanted $target)")
         }
-
-        // Step 5: Await acknowledgement
-        Log.d(TAG, "Step 5: awaiting control notification (ack)")
-        val ackResponse = session.awaitControlNotification()
-        val success = ackResponse != null &&
-            ackResponse.isNotEmpty() &&
-            (ackResponse[0].toInt() and 0xFF) == VeSmartProtocol.OP_PATH_RESPONSE
-        Log.d(TAG, "Step 5: ack=${ackResponse?.toHex()}, success=$success")
-
-        Log.d(TAG, "setLoadOutputMode($address, $value) → success=$success")
-        success
+        false
     } ?: false
 
     /**
-     * Reads the current load output state via VeSmartService.
+     * Reads the current load output mode.
      *
-     * @return the operation mode value (1=auto, 4=always on), or null on failure.
+     * @return the register value (1 = automatic, 4 = always on, bit 7 = streetlight), or null.
      */
     public suspend fun getLoadOutputMode(
         address: String,
         pin: String = "000000",
         timeoutMs: Long = TIMEOUT_MS,
     ): Int? = withGatt(address, pin, timeoutMs) { session ->
-        session.writeControl(VeSmartProtocol.encodeReadyToReceive()) ?: return@withGatt null
-        delay(100)
-
-        session.writeControl(VeSmartProtocol.encodeGetDevices()) ?: return@withGatt null
-        session.awaitDataNotification() ?: return@withGatt null
-        val instanceId = 0
-
-        session.writeControl(VeSmartProtocol.encodeGetPathList(instanceId)) ?: return@withGatt null
-        val pathListResponse = session.awaitDataNotification() ?: return@withGatt null
-        val paths = VeSmartProtocol.parsePathList(pathListResponse)
-
-        val loadPathIndex = paths[VictronRegisters.PATH_LOAD_OPERATION_MODE] ?: return@withGatt null
-
-        val getMsg = VeSmartProtocol.encodeGetPathValue(instanceId, loadPathIndex)
-        session.writeData(getMsg) ?: return@withGatt null
-
-        val valueResponse = session.awaitDataNotification() ?: return@withGatt null
-        VeSmartProtocol.parsePathValue(valueResponse)
+        session.findLoadRegister()?.currentValue
     }
 
     // ---- internals --------------------------------------------------------------------------
@@ -177,7 +131,7 @@ public class VictronGatt(context: Context) {
                 Log.d(TAG, "withGatt: services discovered, enabling notifications…")
                 session.enableNotifications() ?: run { Log.w(TAG, "withGatt: enableNotifications failed"); return@withTimeout null }
                 Log.d(TAG, "withGatt: notifications enabled, initializing session…")
-                if (!session.authenticatePin(pin)) { Log.w(TAG, "withGatt: session init failed"); return@withTimeout null }
+                if (!session.initSession()) { Log.w(TAG, "withGatt: session init failed"); return@withTimeout null }
                 Log.d(TAG, "withGatt: session ready, running block")
                 delay(200) // allow notifications to stabilize
 
@@ -205,8 +159,15 @@ public class VictronGatt(context: Context) {
         private val servicesDeferred = CompletableDeferred<Boolean>()
         private var writeDeferred: CompletableDeferred<Boolean>? = null
         private var descriptorDeferred: CompletableDeferred<Boolean>? = null
-        private var controlNotifyDeferred: CompletableDeferred<ByteArray?>? = null
-        private var dataNotifyDeferred: CompletableDeferred<ByteArray?>? = null
+        /**
+         * Every inbound notification, tagged with its source characteristic.
+         *
+         * Buffered and unbounded on purpose: writes are fire-and-forget
+         * (WriteWithoutResponse), so a reply can land before the caller gets around to
+         * awaiting it. A `CompletableDeferred` created after the write drops exactly
+         * those frames — and drops every chunk after the first of a multi-chunk reply.
+         */
+        private val notifications = Channel<Pair<UUID, ByteArray>>(Channel.UNLIMITED)
 
         val callback = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -247,16 +208,8 @@ public class VictronGatt(context: Context) {
                 characteristic: BluetoothGattCharacteristic,
             ) {
                 val data = characteristic.value ?: return
-                Log.d(TAG, "onNotify ${characteristic.uuid.toString().substring(4,8)}: ${data.toHex()}")
-                // All VeSmartService notifications arrive on 306b chars.
-                // Route to whichever deferred is currently waiting — data takes priority since
-                // it's the protocol response we're actively waiting for.
-                val dataDeferred = dataNotifyDeferred
-                if (dataDeferred != null && !dataDeferred.isCompleted) {
-                    dataDeferred.complete(data)
-                } else {
-                    controlNotifyDeferred?.complete(data)
-                }
+                Log.d(TAG, "onNotify ${characteristic.uuid.toString().substring(4, 8)}: ${data.toHex()}")
+                notifications.trySend(characteristic.uuid to data)
             }
         }
 
@@ -275,7 +228,7 @@ public class VictronGatt(context: Context) {
          * This must happen AFTER enabling notifications on 306b chars.
          */
         @SuppressLint("MissingPermission")
-        suspend fun authenticatePin(pin: String): Boolean {
+        suspend fun initSession(): Boolean {
             val smartService = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: run {
                 Log.w(TAG, "VeSmartService not found for session init")
                 return false
@@ -285,22 +238,24 @@ public class VictronGatt(context: Context) {
                 return false
             }
 
-            // Send session disconnect/reset: fa 80 ff
+            // writeCborChunkSize(0x80, 0xff) — negotiate chunk size.
             writeCharDirect(rxChar, byteArrayOf(0xfa.toByte(), 0x80.toByte(), 0xff.toByte()))
             delay(100)
 
-            // Send ready: f9 80
+            // writeReadyToReceive(0x80) — grant the device credit to send.
             writeCharDirect(rxChar, byteArrayOf(0xf9.toByte(), 0x80.toByte()))
-            delay(300)
 
-            // Wait for f9 01 response (session ready)
-            val response = awaitDataNotification(waitMs = 3000)
-            if (response != null && response.size >= 2 && response[0] == 0xf9.toByte() && response[1] == 0x01.toByte()) {
+            // The ack is f9 01 and arrives on the RX char, not TX. Buffered, so it cannot
+            // be missed even though it usually lands before we start waiting.
+            val response = awaitNotification(VictronRegisters.SMART_RX_UUID, waitMs = 3000) {
+                it.isNotEmpty() && it[0] == 0xf9.toByte()
+            }
+            if (response != null && response.size >= 2 && response[1] == 0x01.toByte()) {
                 Log.d(TAG, "Session initialized (f901)")
                 return true
             }
-            Log.w(TAG, "Session init response: ${response?.joinToString("") { "%02x".format(it) } ?: "null"}")
-            return true // proceed anyway — the device might have already responded
+            Log.w(TAG, "Session init response: ${response?.toHex() ?: "none"}")
+            return false
         }
 
         @SuppressLint("MissingPermission")
@@ -362,15 +317,13 @@ public class VictronGatt(context: Context) {
             return result
         }
 
-        /** Write to the VeSmartService TX characteristic (306b0003). */
-        @SuppressLint("MissingPermission")
-        suspend fun writeControl(payload: ByteArray): Boolean? {
-            val service = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: return null
-            val char = service.getCharacteristic(VictronRegisters.SMART_TX_UUID) ?: return null
-            return writeChar(char, payload)
-        }
-
-        /** Write to the VeSmartService TX characteristic (306b0003) — same as control for this protocol. */
+        /**
+         * Write a command to the VeSmartService TX characteristic (306b0003).
+         *
+         * Only the *last* chunk of a payload belongs on this characteristic — earlier chunks go
+         * to 306b0004. Commands here are a handful of bytes against a negotiated 128-byte chunk
+         * size, so they are always single-chunk and this is the right target.
+         */
         @SuppressLint("MissingPermission")
         suspend fun writeData(payload: ByteArray): Boolean? {
             val service = gatt.getService(VictronRegisters.SMART_SERVICE_UUID) ?: return null
@@ -378,25 +331,80 @@ public class VictronGatt(context: Context) {
             return writeChar(char, payload)
         }
 
-        /** Wait for a notification on the control characteristic (with timeout). */
-        suspend fun awaitControlNotification(waitMs: Long = 3000): ByteArray? {
-            controlNotifyDeferred = CompletableDeferred()
-            return try {
-                withTimeout(waitMs) { controlNotifyDeferred?.await() }
-            } catch (_: TimeoutCancellationException) {
-                null
+        /** The load control register, on whichever instance turned out to expose it. */
+        class LoadRegister(val instance: Int, val currentValue: Int)
+
+        /**
+         * Locates the instance that answers for the load control register and reads its
+         * current value.
+         *
+         * A device can expose several instances and the load register is not necessarily on
+         * instance 0 — a capture of VictronConnect showed it queried on instance 3. Probing
+         * with a read also verifies the addressing before anything is written.
+         */
+        suspend fun findLoadRegister(): LoadRegister? {
+            for (instance in discoverInstances()) {
+                val value = readRegister(instance, VictronRegisters.LOAD_OUTPUT_CONTROL)
+                if (value != null) return LoadRegister(instance, value)
+                Log.d(TAG, "instance $instance did not answer for the load register")
             }
+            Log.w(TAG, "no instance exposed register 0x%04X".format(VictronRegisters.LOAD_OUTPUT_CONTROL))
+            return null
         }
 
-        /** Wait for a notification on the data characteristic (with timeout). */
-        suspend fun awaitDataNotification(waitMs: Long = 5000): ByteArray? {
-            dataNotifyDeferred = CompletableDeferred()
-            return try {
-                withTimeout(waitMs) { dataNotifyDeferred?.await() }
-            } catch (_: TimeoutCancellationException) {
-                null
+        /** Instance ids the device reports, falling back to a small probe range. */
+        private suspend fun discoverInstances(): List<Int> {
+            writeData(VeSmartProtocol.encodeGetDevices()) ?: return DEFAULT_INSTANCES
+            val reply = awaitNotification(VictronRegisters.SMART_TX_UUID, waitMs = 3000) {
+                it.isNotEmpty() && (it[0].toInt() and 0xFF) == VeSmartProtocol.OP_DEVICE_LIST
             }
+            val parsed = reply?.let { VeSmartProtocol.parseDeviceList(it) }.orEmpty()
+            Log.d(TAG, "device list ${reply?.toHex() ?: "none"} -> instances $parsed")
+            return parsed.ifEmpty { DEFAULT_INSTANCES }
         }
+
+        /** Reads one register, or null if the device does not answer for it. */
+        suspend fun readRegister(instance: Int, register: Int): Int? {
+            writeData(VeSmartProtocol.encodeGetRegister(instance, register)) ?: return null
+            val reply = awaitNotification(VictronRegisters.SMART_TX_UUID, waitMs = 2500) { frame ->
+                VeSmartProtocol.errorCode(frame) == null &&
+                    VeSmartProtocol.parseRegisterValue(frame, register) != null
+            } ?: return null
+            return VeSmartProtocol.parseRegisterValue(reply, register)
+        }
+
+        /**
+         * Takes the next buffered notification, optionally only from [from] and only if it
+         * satisfies [accept]. Frames that do not match are consumed and logged — for a
+         * strictly request/response protocol those are interleaved keepalives, which is
+         * exactly what we want to skip.
+         */
+        suspend fun awaitNotification(
+            from: UUID? = null,
+            waitMs: Long = 5000,
+            accept: (ByteArray) -> Boolean = { true },
+        ): ByteArray? = withTimeoutOrNull(waitMs) {
+            for ((uuid, data) in notifications) {
+                if (from != null && uuid != from) {
+                    Log.d(TAG, "skip notify from ${uuid.toString().substring(4, 8)}: ${data.toHex()}")
+                    continue
+                }
+                if (!accept(data)) {
+                    Log.d(TAG, "skip notify (rejected): ${data.toHex()}")
+                    continue
+                }
+                return@withTimeoutOrNull data
+            }
+            null
+        }
+
+        /** Wait for a frame on the VeSmartService RX char (306b0002) — keepalive/ack channel. */
+        suspend fun awaitControlNotification(waitMs: Long = 3000): ByteArray? =
+            awaitNotification(VictronRegisters.SMART_RX_UUID, waitMs)
+
+        /** Wait for a frame on the VeSmartService TX char (306b0003) — command responses. */
+        suspend fun awaitDataNotification(waitMs: Long = 5000): ByteArray? =
+            awaitNotification(VictronRegisters.SMART_TX_UUID, waitMs)
 
         @SuppressLint("MissingPermission")
         private suspend fun writeChar(
@@ -435,6 +443,10 @@ public class VictronGatt(context: Context) {
         private const val TAG = "VictronGatt"
         private const val TIMEOUT_MS = 20_000L
         private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        /** Probed when the device list cannot be read; a capture showed 0, 1 and 3 in use. */
+        private val DEFAULT_INSTANCES = listOf(0, 1, 2, 3)
+
         private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
     }
 }

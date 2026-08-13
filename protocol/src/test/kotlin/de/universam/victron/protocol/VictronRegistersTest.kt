@@ -34,8 +34,11 @@ class VictronRegistersTest {
     }
 
     @Test
-    fun `path constants match VictronConnect QML`() {
-        assertEquals("/Settings/Load/OperationMode", VictronRegisters.PATH_LOAD_OPERATION_MODE)
-        assertEquals("/Mode", VictronRegisters.PATH_MODE)
+    fun `capability register and load bit match the product definition`() {
+        // <vreg label="capabilities_reg" get="0x0140"/> plus
+        // <vreg label="has_load" caps="0x0001"/> from VictronConnect's own product XML.
+        assertEquals(0x0140, VictronRegisters.CAPABILITIES)
+        assertEquals(0x0001, VictronRegisters.CAP_HAS_LOAD)
+        assertEquals(0x0800, VictronRegisters.CAP_HAS_USER_LOAD_SWITCH)
     }
 }

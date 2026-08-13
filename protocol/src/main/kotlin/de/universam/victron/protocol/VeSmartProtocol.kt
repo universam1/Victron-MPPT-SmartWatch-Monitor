@@ -1,134 +1,177 @@
 package de.universam.victron.protocol
 
 /**
- * VeSmartService protocol implementation for Victron BLE GATT communication.
+ * VeSmartService — the connected (GATT) protocol VictronConnect uses to read and write
+ * device settings, as opposed to the connectionless Instant Readout advertisements.
  *
- * This is the path-based CBOR protocol used by VictronConnect (from APK disassembly).
- * The protocol operates on service `68c10001` with control char `68c10002` and data char `68c10003`.
+ * Reverse-engineered from the VictronConnect ARM64 library. See [docs/vesmart-ble-gatt.md].
  *
- * Architecture:
- * - Control char (`68c10002`): opcodes + short params (client↔device)
- * - Data char (`68c10003`): CBOR-chunked path values (device→client notifications, client→device writes)
+ * ## Channels
  *
- * The protocol is path-based: the device reports available paths (like `/Settings/Load/OperationMode`)
- * with integer indices. All get/set operations use these indices, never raw vreg IDs.
+ * Everything runs on service `306b0001`:
+ * - **control** (`306b0002`) — session setup and flow control: `0xfa` chunk size,
+ *   `0xf9` receive credit, `0xf7` error.
+ * - **data / last chunk** (`306b0003`) — commands and replies. A payload that fits one
+ *   chunk goes here whole.
+ * - **continuation** (`306b0004`) — every chunk *except* the last of a multi-chunk payload.
+ *   Chunks are plain slices with no per-chunk header; the negotiated size is 128 bytes, so
+ *   the short commands here are always single-chunk.
+ *
+ * ## Addressing
+ *
+ * Settings are addressed by **16-bit VE.Direct register id**, not by name — e.g. `19 ed ab`
+ * for [VictronRegisters.LOAD_OUTPUT_CONTROL]. The device's own log format string
+ * (`RegId=%04X Flags=%02X Length=%d`) confirms register addressing; the `/Settings/...`
+ * string paths in the app belong to its VenusOS/MQTT transport instead.
+ *
+ * A device may expose several *instances* (VE.Smart networking). The instance follows the
+ * opcode, and the valid instances come from [parseDeviceList] — it is not always `0`.
+ *
+ * ## Framing: a flat CBOR sequence
+ *
+ * A request is a bare concatenation of CBOR items with **no array or map wrapper**:
+ * `<opcode> <instance> <regId> [<value>] …`. Opcodes are all below 24, so each is a single
+ * literal byte. VictronConnect builds this by writing successive `Cbor` values into one
+ * `QDataStream` and handing the buffer to `VeSmartService::writeCbor`.
+ *
+ * Older community documentation describes opcodes `03`/`05`/`06` with an `81`/`82` CBOR
+ * array wrapper. That is a **previous protocol generation**; the shipping app uses the
+ * opcodes below and emits no wrapper. Opcodes 3–6 are unused by current firmware.
  */
 public object VeSmartProtocol {
 
-    // ---- Opcodes (best-effort from symbol ordering in VictronConnect binary) -----------------
-    // These go on the control characteristic (68c10002) as the first byte.
-    // Exact values may need adjustment after hardware testing.
+    // ---- control channel (306b0002) ---------------------------------------------------------
 
-    public const val OP_ERROR: Int = 0x00
-    public const val OP_KEEPALIVE: Int = 0x01
-    public const val OP_READY_TO_RECEIVE: Int = 0x02
-    public const val OP_GET_DEVICES: Int = 0x03
-    public const val OP_DEVICE_LIST: Int = 0x04  // response to GET_DEVICES
-    public const val OP_GET_PATH_LIST: Int = 0x05
-    public const val OP_PATH_LIST: Int = 0x06    // response
-    public const val OP_GET_PATH_VALUE: Int = 0x07
-    public const val OP_PATH_VALUE: Int = 0x08   // response
-    public const val OP_SET_PATH_VALUE: Int = 0x09
-    public const val OP_PATH_RESPONSE: Int = 0x0A // ack for set
-    public const val OP_SUBSCRIBE: Int = 0x0B
-    public const val OP_UNSUBSCRIBE: Int = 0x0C
+    /** Chunk-size negotiation, `fa <size> <flags>`. VictronConnect sends `fa 80 ff`. */
+    public const val CTRL_CHUNK_SIZE: Int = 0xFA
 
-    // ---- CBOR Encoding (minimal RFC 7049 subset) --------------------------------------------
+    /** Receive credit, `f9 <credit>`. VictronConnect sends `f9 80`; the device acks `f9 01`. */
+    public const val CTRL_READY_TO_RECEIVE: Int = 0xF9
+
+    /** Error, `f7 <code> 00`. Code 3 = session not initialised, 2 = invalid command / not ready. */
+    public const val CTRL_ERROR: Int = 0xF7
+
+    /** Negotiated chunk size in bytes. The device starts at 20 and is raised to this. */
+    public const val CHUNK_SIZE: Int = 0x80
+
+    /** `fa 80 ff` — negotiate the chunk size. First frame of session setup. */
+    public fun encodeChunkSize(size: Int = CHUNK_SIZE, flags: Int = 0xFF): ByteArray =
+        byteArrayOf(CTRL_CHUNK_SIZE.toByte(), size.toByte(), flags.toByte())
+
+    /** `f9 <credit>` — grant the device credit to send. Second frame of session setup. */
+    public fun encodeReadyToReceive(credit: Int = 0x80): ByteArray =
+        byteArrayOf(CTRL_READY_TO_RECEIVE.toByte(), credit.toByte())
+
+    /** True when [frame] is the `f9 01` session-ready ack. */
+    public fun isSessionReady(frame: ByteArray): Boolean =
+        frame.size >= 2 && (frame[0].toInt() and 0xFF) == CTRL_READY_TO_RECEIVE && frame[1].toInt() == 0x01
+
+    /** Error code of an `f7 <code> ..` frame, or null when [frame] is not an error. */
+    public fun errorCode(frame: ByteArray): Int? =
+        if (frame.size >= 2 && (frame[0].toInt() and 0xFF) == CTRL_ERROR) frame[1].toInt() and 0xFF else null
+
+    // ---- data channel opcodes ---------------------------------------------------------------
+    // Requests
+
+    /** Enumerate instances. No payload. */
+    public const val OP_GET_DEVICES: Int = 0x01
+
+    /** List the registers an instance exposes. Payload: instance. */
+    public const val OP_GET_PATH_LIST: Int = 0x0A
+
+    /** Read registers. Payload: instance, then one or more register ids. */
+    public const val OP_GET_VALUES: Int = 0x0B
+
+    /** Write registers. Payload: instance, then (register id, value) pairs. */
+    public const val OP_SET_VALUES: Int = 0x0C
+
+    // Responses
+
+    /** Reply to [OP_GET_DEVICES]. */
+    public const val OP_DEVICE_LIST: Int = 0x02
+
+    /** Generic ack / status. */
+    public const val OP_RESPONSE: Int = 0x07
+
+    /** A value. */
+    public const val OP_VALUE: Int = 0x08
+
+    /** Ack for a value write. */
+    public const val OP_VALUE_RESPONSE: Int = 0x09
+
+    /** Reply to [OP_GET_PATH_LIST]. */
+    public const val OP_PATH_LIST: Int = 0x0D
+
+    /** The device announcing a newly available register. */
+    public const val OP_NEW_PATH: Int = 0x0E
+
+    /** A register's value. */
+    public const val OP_PATH_VALUE: Int = 0x0F
 
     /**
-     * Encodes a VeSmartService control message (sent on 68c10002).
-     * Format: `[opcode, ...params]` as raw bytes (not CBOR-wrapped for control messages).
+     * Register the session keepalive is written to. VictronConnect writes 10000 (ms) to it
+     * every 10 s; letting it lapse ends the session.
      */
-    public fun encodeControlMessage(opcode: Int, vararg params: Int): ByteArray {
-        val result = ByteArray(1 + params.size)
-        result[0] = opcode.toByte()
-        params.forEachIndexed { i, v -> result[i + 1] = v.toByte() }
-        return result
-    }
+    public const val KEEPALIVE_REGISTER: Int = 0x0093
 
-    /** Encode a KeepAlive message for the control characteristic. */
-    public fun encodeKeepAlive(): ByteArray = encodeControlMessage(OP_KEEPALIVE)
+    /** How often the keepalive must be rewritten, matching VictronConnect's timer. */
+    public const val KEEPALIVE_INTERVAL_MS: Long = 10_000L
 
-    /** Encode a ReadyToReceive(n) message — tells device we have n free chunk slots. */
-    public fun encodeReadyToReceive(freeSlots: Int = 0x10): ByteArray =
-        encodeControlMessage(OP_READY_TO_RECEIVE, freeSlots)
+    // ---- requests ---------------------------------------------------------------------------
 
-    /** Encode a GetDevices request. */
-    public fun encodeGetDevices(): ByteArray = encodeControlMessage(OP_GET_DEVICES)
+    /** `01` — enumerate instances. */
+    public fun encodeGetDevices(): ByteArray = byteArrayOf(OP_GET_DEVICES.toByte())
 
-    /** Encode a GetPathList request for a device instance. */
-    public fun encodeGetPathList(instanceId: Int): ByteArray =
-        byteArrayOf(OP_GET_PATH_LIST.toByte()) + cborEncodeUint(instanceId)
+    /** `0a <instance>` — list the registers an instance exposes. */
+    public fun encodeGetPathList(instance: Int): ByteArray =
+        byteArrayOf(OP_GET_PATH_LIST.toByte()) + cborEncodeUint(instance)
+
+    /** `0b <instance> <regId>` — read one register. */
+    public fun encodeGetRegister(instance: Int, register: Int): ByteArray =
+        byteArrayOf(OP_GET_VALUES.toByte()) + cborEncodeUint(instance) + cborRegisterId(register)
 
     /**
-     * Encode a SetPathValue message (sent on 68c10003 as CBOR).
+     * `0c <instance> <regId> <value>` — write one register.
      *
-     * CBOR structure: array(3) [ instanceId, pathIndex, value ]
-     * The outer opcode byte prefixes the CBOR payload.
+     * [asByteString] selects how the value is encoded. VictronConnect has two write paths:
+     * `setPathValues` passes a QVariant, which serialises an integer as a CBOR unsigned int,
+     * while `setValue` passes a QByteArray, which serialises as a CBOR byte string holding
+     * the register's little-endian bytes (that is how the keepalive writes 10000 as
+     * `42 10 27`). Settings edited from the UI take the QVariant path, so the unsigned-int
+     * form is the default.
      */
-    public fun encodeSetPathValue(instanceId: Int, pathIndex: Int, value: Int): ByteArray {
-        // Opcode prefix + CBOR array of 3 elements
-        val cbor = cborEncodeArray(3) +
-            cborEncodeUint(instanceId) +
-            cborEncodeUint(pathIndex) +
-            cborEncodeUint(value)
-        return byteArrayOf(OP_SET_PATH_VALUE.toByte()) + cbor
-    }
-
-    /**
-     * Encode a GetPathValue message.
-     */
-    public fun encodeGetPathValue(instanceId: Int, pathIndex: Int): ByteArray {
-        val cbor = cborEncodeArray(2) +
-            cborEncodeUint(instanceId) +
-            cborEncodeUint(pathIndex)
-        return byteArrayOf(OP_GET_PATH_VALUE.toByte()) + cbor
-    }
-
-    // ---- CBOR Decoding (minimal) ------------------------------------------------------------
-
-    /**
-     * Parse a path list response to extract path strings and their indices.
-     * The response is CBOR-encoded on the data characteristic.
-     *
-     * Expected structure: opcode byte + CBOR map { pathIndex: pathString, ... }
-     * or: opcode byte + CBOR array of [index, path] pairs.
-     *
-     * Returns a map of path string → integer index.
-     */
-    public fun parsePathList(response: ByteArray): Map<String, Int> {
-        if (response.isEmpty()) return emptyMap()
-        val paths = mutableMapOf<String, Int>()
-        // Skip opcode byte, then parse CBOR
-        val data = if (response[0].toInt() and 0xFF == OP_PATH_LIST) {
-            response.copyOfRange(1, response.size)
+    public fun encodeSetRegister(
+        instance: Int,
+        register: Int,
+        value: Int,
+        asByteString: Boolean = false,
+        valueBytes: Int = 1,
+    ): ByteArray {
+        val encodedValue = if (asByteString) {
+            cborEncodeBytes(littleEndian(value, valueBytes))
         } else {
-            response
+            cborEncodeUint(value)
         }
-        // Best-effort CBOR map/array parsing
-        val parsed = CborDecoder(data)
-        parsed.tryParsePathMap(paths)
-        return paths
+        return byteArrayOf(OP_SET_VALUES.toByte()) + cborEncodeUint(instance) +
+            cborRegisterId(register) + encodedValue
     }
+
+    /** The session keepalive: write 10000 ms to [KEEPALIVE_REGISTER] as a little-endian u16. */
+    public fun encodeKeepAlive(instance: Int = 0): ByteArray =
+        encodeSetRegister(instance, KEEPALIVE_REGISTER, 10_000, asByteString = true, valueBytes = 2)
+
+    // ---- CBOR helpers -----------------------------------------------------------------------
 
     /**
-     * Parse a path value response.
-     * Returns the integer value, or null if unparseable.
+     * A register id as CBOR. Always the 2-byte `19 <hi> <lo>` unsigned form, which is what
+     * VictronConnect emits even for ids that would fit a shorter encoding.
      */
-    public fun parsePathValue(response: ByteArray): Int? {
-        if (response.size < 2) return null
-        // Skip opcode byte, decode CBOR
-        val data = response.copyOfRange(1, response.size)
-        val decoder = CborDecoder(data)
-        // Expect: array(3) [instanceId, pathIndex, value] or just the value
-        return decoder.tryParseIntValue()
-    }
+    public fun cborRegisterId(register: Int): ByteArray =
+        byteArrayOf(0x19, ((register shr 8) and 0xFF).toByte(), (register and 0xFF).toByte())
 
-    // ---- Minimal CBOR encoder (RFC 7049) ----------------------------------------------------
-
-    /** Encode an unsigned integer in CBOR (major type 0). */
+    /** Encode an unsigned integer, CBOR major type 0. */
     public fun cborEncodeUint(value: Int): ByteArray {
-        require(value >= 0) { "Only unsigned values supported" }
+        require(value >= 0) { "only unsigned values supported" }
         return when {
             value < 24 -> byteArrayOf(value.toByte())
             value < 256 -> byteArrayOf(0x18, value.toByte())
@@ -136,185 +179,113 @@ public object VeSmartProtocol {
             else -> byteArrayOf(
                 0x1A,
                 (value shr 24).toByte(),
-                (value shr 16 and 0xFF).toByte(),
-                (value shr 8 and 0xFF).toByte(),
+                ((value shr 16) and 0xFF).toByte(),
+                ((value shr 8) and 0xFF).toByte(),
                 (value and 0xFF).toByte(),
             )
         }
     }
 
-    /** Encode a CBOR array header (major type 4). */
-    public fun cborEncodeArray(length: Int): ByteArray {
-        val base = 0x80
-        return when {
-            length < 24 -> byteArrayOf((base or length).toByte())
-            length < 256 -> byteArrayOf((base or 24).toByte(), length.toByte())
-            else -> byteArrayOf(
-                (base or 25).toByte(),
-                (length shr 8).toByte(),
-                (length and 0xFF).toByte(),
-            )
-        }
-    }
-
-    /** Encode a CBOR map header (major type 5). */
-    public fun cborEncodeMap(length: Int): ByteArray {
-        val base = 0xA0
-        return when {
-            length < 24 -> byteArrayOf((base or length).toByte())
-            length < 256 -> byteArrayOf((base or 24).toByte(), length.toByte())
-            else -> byteArrayOf(
-                (base or 25).toByte(),
-                (length shr 8).toByte(),
-                (length and 0xFF).toByte(),
-            )
-        }
-    }
-
-    /** Encode a UTF-8 string in CBOR (major type 3). */
-    public fun cborEncodeString(value: String): ByteArray {
-        val utf8 = value.toByteArray(Charsets.UTF_8)
+    /** CBOR byte string, major type 2. */
+    public fun cborEncodeBytes(value: ByteArray): ByteArray {
         val header = when {
-            utf8.size < 24 -> byteArrayOf((0x60 or utf8.size).toByte())
-            utf8.size < 256 -> byteArrayOf(0x78, utf8.size.toByte())
-            else -> byteArrayOf(0x79, (utf8.size shr 8).toByte(), (utf8.size and 0xFF).toByte())
+            value.size < 24 -> byteArrayOf((0x40 or value.size).toByte())
+            value.size < 256 -> byteArrayOf(0x58, value.size.toByte())
+            else -> byteArrayOf(0x59, (value.size shr 8).toByte(), (value.size and 0xFF).toByte())
         }
-        return header + utf8
+        return header + value
     }
 
-    // ---- Minimal CBOR decoder ---------------------------------------------------------------
+    /** [value] as [count] little-endian bytes, the layout VE.Direct registers use. */
+    public fun littleEndian(value: Int, count: Int): ByteArray =
+        ByteArray(count) { ((value shr (8 * it)) and 0xFF).toByte() }
+
+    // ---- replies ----------------------------------------------------------------------------
 
     /**
-     * Minimal CBOR decoder for parsing VeSmartService responses.
+     * Instance ids from an [OP_DEVICE_LIST] reply.
+     *
+     * The payload is a sequence of small unsigned ints, seen as `<instance> <flags>` pairs and
+     * optionally wrapped in a CBOR indefinite array (`9f … ff`).
      */
-    public class CborDecoder(private val data: ByteArray) {
-        private var pos = 0
-
-        /** Try to parse a CBOR map of { int → string } into the paths map (index → path). */
-        public fun tryParsePathMap(paths: MutableMap<String, Int>) {
-            if (pos >= data.size) return
-            val header = data[pos].toInt() and 0xFF
-            val majorType = header shr 5
-
-            when (majorType) {
-                5 -> { // Map
-                    val count = readLength(header)
-                    repeat(count) {
-                        val index = readUint() ?: return
-                        val path = readString() ?: return
-                        paths[path] = index
-                    }
+    public fun parseDeviceList(frame: ByteArray): List<Int> {
+        if (frame.size < 2 || (frame[0].toInt() and 0xFF) != OP_DEVICE_LIST) return emptyList()
+        var i = 1
+        if ((frame[i].toInt() and 0xFF) == 0x9F) i++ // indefinite array start
+        val ints = mutableListOf<Int>()
+        while (i < frame.size) {
+            val b = frame[i].toInt() and 0xFF
+            if (b == 0xFF) break // break marker
+            when {
+                b < 24 -> { ints += b; i++ }
+                b == 0x18 && i + 1 < frame.size -> { ints += frame[i + 1].toInt() and 0xFF; i += 2 }
+                b == 0x19 && i + 2 < frame.size -> {
+                    ints += ((frame[i + 1].toInt() and 0xFF) shl 8) or (frame[i + 2].toInt() and 0xFF)
+                    i += 3
                 }
-                4 -> { // Array of pairs
-                    val count = readLength(header)
-                    repeat(count) {
-                        // Each element might be array(2) [index, path]
-                        val pairHeader = peekByte() ?: return
-                        if ((pairHeader shr 5) == 4) {
-                            pos++ // consume array header
-                            val pairLen = readLengthFromAdditional(pairHeader and 0x1F)
-                            if (pairLen >= 2) {
-                                val index = readUint() ?: return
-                                val path = readString() ?: return
-                                paths[path] = index
-                                // skip remaining elements
-                                repeat(pairLen - 2) { skipValue() }
-                            }
-                        } else {
-                            skipValue()
-                        }
-                    }
-                }
-                else -> return
+                else -> i++ // skip the unexpected rather than give up on the frame
             }
         }
+        // Even positions are instance ids, odd ones flags.
+        return ints.filterIndexed { idx, _ -> idx % 2 == 0 }.distinct()
+    }
 
-        /** Try to extract an integer value from a response (skip array wrapper if present). */
-        public fun tryParseIntValue(): Int? {
-            if (pos >= data.size) return null
-            val header = data[pos].toInt() and 0xFF
-            val majorType = header shr 5
-            if (majorType == 4) {
-                // Array — skip to last element (typically array(3) [instance, pathIdx, value])
-                val count = readLength(header)
-                if (count >= 3) {
-                    readUint() // instanceId
-                    readUint() // pathIndex
-                    return readUint() // value
-                }
-                return null
-            }
-            return readUint()
-        }
+    /** True when [frame] is a reply that carries register values. */
+    public fun carriesValue(frame: ByteArray): Boolean =
+        frame.isNotEmpty() && (frame[0].toInt() and 0xFF) in
+            setOf(OP_VALUE, OP_VALUE_RESPONSE, OP_PATH_VALUE, OP_RESPONSE)
 
-        private fun readUint(): Int? {
-            if (pos >= data.size) return null
-            val header = data[pos].toInt() and 0xFF
-            val majorType = header shr 5
-            if (majorType != 0) return null // not unsigned int
-            return readLength(header)
-        }
-
-        private fun readString(): String? {
-            if (pos >= data.size) return null
-            val header = data[pos].toInt() and 0xFF
-            val majorType = header shr 5
-            if (majorType != 3) return null // not text string
-            val length = readLength(header)
-            if (pos + length > data.size) return null
-            val str = String(data, pos, length, Charsets.UTF_8)
-            pos += length
-            return str
-        }
-
-        private fun readLength(header: Int): Int {
-            val additional = header and 0x1F
-            pos++ // consume the header byte
-            return readLengthFromAdditional(additional)
-        }
-
-        private fun readLengthFromAdditional(additional: Int): Int {
-            return when {
-                additional < 24 -> additional
-                additional == 24 -> {
-                    val v = data[pos].toInt() and 0xFF
-                    pos++
-                    v
-                }
-                additional == 25 -> {
-                    val v = ((data[pos].toInt() and 0xFF) shl 8) or (data[pos + 1].toInt() and 0xFF)
-                    pos += 2
-                    v
-                }
-                additional == 26 -> {
-                    val v = ((data[pos].toInt() and 0xFF) shl 24) or
-                        ((data[pos + 1].toInt() and 0xFF) shl 16) or
-                        ((data[pos + 2].toInt() and 0xFF) shl 8) or
-                        (data[pos + 3].toInt() and 0xFF)
-                    pos += 4
-                    v
-                }
-                else -> 0
+    /**
+     * Value of [register] in a reply frame, or null when the frame does not carry it.
+     *
+     * Scans for the register id as a big-endian uint16 and decodes the CBOR item after it,
+     * which tolerates the differing wrappers used for single versus batched replies.
+     */
+    public fun parseRegisterValue(frame: ByteArray, register: Int): Int? {
+        val hi = ((register shr 8) and 0xFF).toByte()
+        val lo = (register and 0xFF).toByte()
+        for (i in 0 until frame.size - 2) {
+            if (frame[i] == hi && frame[i + 1] == lo) {
+                decodeUintAt(frame, i + 2)?.let { return it }
             }
         }
+        return null
+    }
 
-        private fun peekByte(): Int? {
-            if (pos >= data.size) return null
-            return data[pos].toInt() and 0xFF
+    /** Decodes the CBOR unsigned int or byte string at [pos] to an integer. */
+    private fun decodeUintAt(frame: ByteArray, pos: Int): Int? {
+        if (pos >= frame.size) return null
+        val b = frame[pos].toInt() and 0xFF
+        return when {
+            b < 24 -> b
+            b == 0x18 && pos + 1 < frame.size -> frame[pos + 1].toInt() and 0xFF
+            b == 0x19 && pos + 2 < frame.size ->
+                ((frame[pos + 1].toInt() and 0xFF) shl 8) or (frame[pos + 2].toInt() and 0xFF)
+            // byte string: the register payload, little endian as VE.Direct stores it
+            b in 0x41..0x44 -> {
+                val n = b - 0x40
+                if (pos + n >= frame.size) return null
+                var v = 0
+                for (k in 0 until n) v = v or ((frame[pos + 1 + k].toInt() and 0xFF) shl (8 * k))
+                v
+            }
+            else -> null
         }
+    }
 
-        private fun skipValue() {
-            if (pos >= data.size) return
-            val header = data[pos].toInt() and 0xFF
-            val majorType = header shr 5
-            val length = readLength(header)
-            when (majorType) {
-                0, 1 -> {} // integer, length already consumed
-                2, 3 -> pos += length // byte/text string
-                4 -> repeat(length) { skipValue() } // array
-                5 -> repeat(length * 2) { skipValue() } // map
-                else -> {}
+    /** Register ids advertised in an [OP_PATH_LIST] reply. */
+    public fun parseRegisterList(frame: ByteArray): List<Int> {
+        if (frame.isEmpty() || (frame[0].toInt() and 0xFF) != OP_PATH_LIST) return emptyList()
+        val regs = mutableListOf<Int>()
+        var i = 1
+        while (i < frame.size - 2) {
+            if ((frame[i].toInt() and 0xFF) == 0x19) {
+                regs += ((frame[i + 1].toInt() and 0xFF) shl 8) or (frame[i + 2].toInt() and 0xFF)
+                i += 3
+            } else {
+                i++
             }
         }
+        return regs
     }
 }

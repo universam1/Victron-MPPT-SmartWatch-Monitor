@@ -89,15 +89,30 @@ public object VictronRegisters {
     /** Device capabilities register (read, firmware >= 1.16). */
     public const val CAPABILITIES: Int = 0x0140
 
-    // ---- Load output control values (path `/Settings/Load/OperationMode`) -------------------
+    // ---- Load output control values (register 0xEDAB) ---------------------------------------
+    // VictronConnect writes this register directly; its QML calls the same value
+    // `loadOperationMode`. Only 1 and 4 are needed for an on/off toggle.
 
-    /** Automatic — BatteryLife algorithm, load follows voltage thresholds. */
+    /** Automatic — load follows the battery voltage thresholds. */
     public const val LOAD_AUTO: Int = 1
 
     /** Always on — load output permanently enabled. */
     public const val LOAD_ALWAYS_ON: Int = 4
 
-    // ---- Capability bits (from register 0x0140) ---------------------------------------------
+    /**
+     * Streetlight flag, bit 7 of [LOAD_OUTPUT_CONTROL]. It shares the register with the mode,
+     * so a write must carry the current flag through or it silently turns streetlight off.
+     */
+    public const val LOAD_STREETLIGHT_BIT: Int = 0x80
+
+    /** Mode part of a [LOAD_OUTPUT_CONTROL] value, with the streetlight flag masked off. */
+    public fun loadMode(registerValue: Int): Int = registerValue and LOAD_STREETLIGHT_BIT.inv() and 0xFF
+
+    /** Combines a [LOAD_AUTO]/[LOAD_ALWAYS_ON] mode with the streetlight flag of [previous]. */
+    public fun loadValuePreservingFlags(mode: Int, previous: Int): Int =
+        (mode and 0x7F) or (previous and LOAD_STREETLIGHT_BIT)
+
+    // ---- Capability bits (from register 0x0140, firmware >= 1.16) ---------------------------
 
     /** Device has a physical load output. */
     public const val CAP_HAS_LOAD: Int = 0x0001
@@ -105,19 +120,21 @@ public object VictronRegisters {
     /** Device has user-configurable load switch voltage levels. */
     public const val CAP_HAS_USER_LOAD_SWITCH: Int = 0x0800
 
-    // ---- VeSmartService path constants ------------------------------------------------------
-
-    /** Path for load output operation mode (values: 1=auto, 4=always on). */
-    public const val PATH_LOAD_OPERATION_MODE: String = "/Settings/Load/OperationMode"
-
-    /** Path for charger mode (values: 1=on, 4=off, 0xFD=hibernate). */
-    public const val PATH_MODE: String = "/Mode"
-
-    /** Path for load output state (read-only, 0=off, 1=on). */
-    public const val PATH_LOAD_STATE: String = "/Load/State"
+    /** Device has a virtual load output. */
+    public const val CAP_HAS_VIRTUAL_LOAD: Int = 0x80000
 
     // ---- Product IDs with load output -------------------------------------------------------
 
     /** SmartSolar MPPT 100/20-48V. */
     public const val PRODUCT_SMARTSOLAR_100_20_48V: Int = 0xA05F
+
+    /**
+     * Product ids whose load output is configurable, verbatim from VictronConnect's
+     * `hasLoadOutputConfig` QML property.
+     */
+    public val PRODUCTS_WITH_LOAD_OUTPUT: Set<Int> = setOf(
+        0xA04C, 0xA054, 0xA042, 0xA053, 0xA043, 0xA055,
+        0xA066, 0xA05F, 0xA067, 0xA060, 0xA07B, 0xA079,
+        0xA07C, 0xA074, 0xA07A, 0xA07D, 0xA07F, 0xA075,
+    )
 }
