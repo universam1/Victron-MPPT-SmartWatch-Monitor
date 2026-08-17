@@ -8,6 +8,7 @@
     <string name="empty_hint">Enable “Instant readout” for the device in VictronConnect, then scan. Devices show up here even before you enter a key.</string>
 
     <string name="permission_needed">Bluetooth scanning permission is required</string>
+    <string name="permission_needed_location">Location permission is required for Bluetooth scanning on this Android version</string>
     <string name="permission_grant">Grant permission</string>
     <string name="bluetooth_off">Bluetooth is off</string>
     <string name="no_ble">No Bluetooth LE on this device</string>

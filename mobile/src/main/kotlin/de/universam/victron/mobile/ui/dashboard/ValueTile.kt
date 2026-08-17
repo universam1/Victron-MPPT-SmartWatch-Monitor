@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.VictronPalette
@@ -110,10 +111,11 @@ fun ValueTile(
             }
             Text(
                 text = value,
-                fontSize = if (compact) 18.sp else 22.sp,
+                fontSize = if (compact) 18.sp else 28.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (stale) TEXT_DIM else TEXT_PRIMARY,
-                modifier = Modifier.padding(top = 2.dp),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             )
         }
     }

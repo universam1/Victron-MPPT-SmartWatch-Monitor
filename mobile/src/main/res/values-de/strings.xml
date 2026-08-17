@@ -8,6 +8,7 @@
     <string name="empty_hint">„Instant readout“ für das Gerät in VictronConnect aktivieren, dann scannen. Geräte erscheinen hier auch ohne Schlüssel.</string>
 
     <string name="permission_needed">Berechtigung für Bluetooth-Suche nötig</string>
+    <string name="permission_needed_location">Standortberechtigung wird für die Bluetooth-Suche auf dieser Android-Version benötigt</string>
     <string name="permission_grant">Berechtigung erteilen</string>
     <string name="bluetooth_off">Bluetooth ist aus</string>
     <string name="no_ble">Kein Bluetooth LE auf diesem Gerät</string>

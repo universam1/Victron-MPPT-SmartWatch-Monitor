@@ -24,9 +24,12 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +81,17 @@ fun HeroScreen(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) viewModel.retryScan() }
 
+    // Auto-request BLE permission on startup (once per launch).
+    var permissionRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(scanState) {
+        if (!permissionRequested &&
+            (scanState as? ScanState.Unavailable)?.reason == ScanUnavailable.NoPermission
+        ) {
+            permissionRequested = true
+            permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION)
+        }
+    }
+
     val decoded = snapshots.filter { it.status == SnapshotStatus.DECODED }
     var index by remember { mutableIntStateOf(0) }
     val selected = decoded.getOrNull(index.coerceIn(0, (decoded.size - 1).coerceAtLeast(0)))
@@ -104,13 +118,7 @@ fun HeroScreen(
         now = now,
         deviceCount = decoded.size,
         status = status,
-        onStatusClick = {
-            if (blockedBy == ScanUnavailable.NoPermission) {
-                permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION)
-            } else {
-                onOpenDevices()
-            }
-        },
+        onStatusClick = { onOpenDevices() },
         onCycleDevice = { if (decoded.isNotEmpty()) index = (index + 1) % decoded.size },
         onOpenDevices = onOpenDevices,
     )

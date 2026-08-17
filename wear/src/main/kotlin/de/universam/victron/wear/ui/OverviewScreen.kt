@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +53,17 @@ fun OverviewScreen(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) viewModel.retryScan() }
 
+    // Auto-request BLE permission on startup (once per launch).
+    var permissionRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(scanState) {
+        if (!permissionRequested &&
+            (scanState as? ScanState.Unavailable)?.reason == ScanUnavailable.NoPermission
+        ) {
+            permissionRequested = true
+            permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION)
+        }
+    }
+
     val listState = rememberScalingLazyListState()
     ScalingLazyColumn(
         state = listState,
@@ -65,12 +81,11 @@ fun OverviewScreen(
             }
         }
 
-        if (scanState is ScanState.Unavailable) {
+        if (scanState is ScanState.Unavailable &&
+            scanState.reason != ScanUnavailable.NoPermission
+        ) {
             item {
-                UnavailableCard(
-                    reason = scanState.reason,
-                    onGrantPermission = { permissionLauncher.launch(BLUETOOTH_SCAN_PERMISSION) },
-                )
+                UnavailableCard(reason = scanState.reason)
             }
         }
 
@@ -190,28 +205,21 @@ private fun StatusLine(text: String) {
 }
 
 @Composable
-private fun UnavailableCard(reason: ScanUnavailable, onGrantPermission: () -> Unit) {
+private fun UnavailableCard(reason: ScanUnavailable) {
     Card(
-        onClick = { if (reason == ScanUnavailable.NoPermission) onGrantPermission() },
+        onClick = {},
         modifier = Modifier.fillMaxWidth(),
     ) {
         val message = when (reason) {
-            ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
             ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
             ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
             is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
+            else -> ""
         }
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
-        if (reason == ScanUnavailable.NoPermission) {
-            Text(
-                text = stringResource(R.string.permission_grant),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
     }
 }

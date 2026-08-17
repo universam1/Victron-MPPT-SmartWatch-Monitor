@@ -57,7 +57,12 @@ import de.universam.victron.mobile.R
 import de.universam.victron.mobile.ui.dashboard.DashboardScreen
 import kotlinx.coroutines.delay
 
-private const val BLUETOOTH_SCAN = android.Manifest.permission.BLUETOOTH_SCAN
+/** The runtime permission that gates BLE scanning on this API level. */
+private val BLE_PERMISSION = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+    android.Manifest.permission.BLUETOOTH_SCAN
+} else {
+    android.Manifest.permission.ACCESS_FINE_LOCATION
+}
 
 /** Widest the setup form gets — beyond this a text field is just a long line to read. */
 private val MAX_FORM_WIDTH = 560.dp
@@ -76,6 +81,21 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
     val config by viewModel.config.collectAsStateWithLifecycle()
     val scanState by viewModel.scanState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) viewModel.retryScan() }
+
+    // Auto-request BLE permission on startup (once per launch).
+    var permissionRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(scanState) {
+        if (!permissionRequested &&
+            (scanState as? ScanState.Unavailable)?.reason == ScanUnavailable.NoPermission
+        ) {
+            permissionRequested = true
+            permissionLauncher.launch(BLE_PERMISSION)
+        }
+    }
 
     DisposableEffect(Unit) {
         viewModel.startLiveScan()
@@ -140,10 +160,6 @@ private fun SetupContent(
     now: Long,
     onOpenDashboard: () -> Unit,
 ) {
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) viewModel.retryScan() }
-
     // A form stretched across a landscape phone is unreadable, so the content keeps a sane
     // measure and centres in whatever width is left.
     Box(
@@ -184,21 +200,18 @@ private fun SetupContent(
             }
 
             (scanState as? ScanState.Unavailable)?.let { unavailable ->
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = when (val reason = unavailable.reason) {
-                                    ScanUnavailable.NoPermission -> stringResource(R.string.permission_needed)
-                                    ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
-                                    ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
-                                    is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
-                                },
-                            )
-                            if (unavailable.reason == ScanUnavailable.NoPermission) {
-                                Button(onClick = { permissionLauncher.launch(BLUETOOTH_SCAN) }) {
-                                    Text(stringResource(R.string.permission_grant))
-                                }
+                if (unavailable.reason != ScanUnavailable.NoPermission) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = when (val reason = unavailable.reason) {
+                                        ScanUnavailable.BluetoothOff -> stringResource(R.string.bluetooth_off)
+                                        ScanUnavailable.NoLeSupport -> stringResource(R.string.no_ble)
+                                        is ScanUnavailable.Failed -> "Scan error ${reason.errorCode}"
+                                        else -> ""
+                                    },
+                                )
                             }
                         }
                     }

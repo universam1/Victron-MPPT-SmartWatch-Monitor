@@ -1,11 +1,14 @@
 package de.universam.victron.data
 
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -26,6 +29,27 @@ public class ScanWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
+
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val channelId = "victron_scan"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId, "BLE Scan", android.app.NotificationManager.IMPORTANCE_LOW,
+            )
+            applicationContext.getSystemService(android.app.NotificationManager::class.java)
+                .createNotificationChannel(channel)
+        }
+        val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentTitle("Scanning for Victron devices")
+            .setSilent(true)
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            ForegroundInfo(NOTIFICATION_ID, notification)
+        }
+    }
 
     override suspend fun doWork(): Result {
         val repository = VictronData.repository(applicationContext)
@@ -54,6 +78,7 @@ public class ScanWorker(
 
     public companion object {
         private const val TAG = "ScanWorker"
+        private const val NOTIFICATION_ID = 9001
         internal const val KEY_SECONDS = "seconds"
         internal const val KEY_AGGRESSIVENESS = "aggressiveness"
 

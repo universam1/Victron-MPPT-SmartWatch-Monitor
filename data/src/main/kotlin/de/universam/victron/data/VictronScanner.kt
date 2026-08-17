@@ -9,6 +9,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import de.universam.victron.protocol.VictronBle
@@ -72,7 +73,12 @@ public class VictronScanner(context: Context) {
     private val appContext = context.applicationContext
 
     public fun canScan(): ScanUnavailable? {
-        if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.BLUETOOTH_SCAN) !=
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Manifest.permission.BLUETOOTH_SCAN
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (ContextCompat.checkSelfPermission(appContext, permission) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             return ScanUnavailable.NoPermission

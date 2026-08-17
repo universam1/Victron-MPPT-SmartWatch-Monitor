@@ -5,7 +5,7 @@ kotlin = "2.2.21"
 compileSdk = "36"
 targetSdk = "36"
 minSdkWear = "33"
-minSdkMobile = "31"
+minSdkMobile = "29"
 
 # Libraries
 activityCompose = "1.9.3"

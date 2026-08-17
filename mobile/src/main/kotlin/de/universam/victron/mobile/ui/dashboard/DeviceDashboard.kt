@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
@@ -86,6 +87,7 @@ fun DeviceDashboard(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val twoColumn = maxWidth > maxHeight
+        val compact = twoColumn && maxHeight < 500.dp
 
         Column(
             modifier = Modifier
@@ -135,14 +137,15 @@ fun DeviceDashboard(
                             amps = values?.batteryCurrent,
                             stale = stale,
                             sparklineValues = history?.batteryCurrent.orEmpty(),
-                            // Vertical space is the scarce one in landscape.
-                            sparklineHeight = 36.dp,
+                            // Vertical space is scarce on a phone landscape;
+                            // head units (>=500dp tall) get the full sparkline.
+                            sparklineHeight = if (compact) 36.dp else 72.dp,
                         )
                         ValueTiles(
                             values = values,
                             history = history,
                             stale = stale,
-                            compact = true,
+                            compact = compact,
                         )
                     }
                 }
@@ -295,10 +298,11 @@ private fun ValueTiles(
                 }
                 Text(
                     text = stateLabel ?: Formatting.PLACEHOLDER,
-                    fontSize = if (compact) 18.sp else 22.sp,
+                    fontSize = if (compact) 18.sp else 28.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = chipColor,
-                    modifier = Modifier.padding(top = 2.dp),
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
             }
         }

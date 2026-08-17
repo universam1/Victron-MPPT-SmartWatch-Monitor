@@ -139,6 +139,29 @@ fun PreviewDeviceDashboardLandscapeEmpty() {
     }
 }
 
+/** Head unit: large landscape, non-compact tiles with right-aligned values and full sparklines. */
+@PreviewTest
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 1280, heightDp = 720)
+@Composable
+fun PreviewDeviceDashboardHeadUnit() {
+    val history = ReadingHistory(
+        batteryCurrent = sampleSparkline.toList(),
+        batteryVoltage = sampleVoltageSparkline.toList(),
+        pvPowerW = samplePowerSparkline.toList(),
+        yieldTodayWh = sampleYieldSparkline.toList(),
+        loadCurrent = sampleSparkline.map { it * 0.3f },
+    )
+    Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
+        DeviceDashboard(
+            snapshot = sampleSnapshot,
+            peakWatts = 380,
+            now = System.currentTimeMillis(),
+            history = history,
+            onOpenSetup = {},
+        )
+    }
+}
+
 /** No device decoded yet: the dashboard still renders, with placeholders instead of values. */
 @PreviewTest
 @Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 390, heightDp = 800)
