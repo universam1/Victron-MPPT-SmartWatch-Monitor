@@ -112,7 +112,8 @@ fun DeviceDashboard(
                     // The gauge is square and follows the height here — in landscape the width is
                     // the abundant dimension, and matching it would push everything else off screen.
                     Box(
-                        modifier = Modifier.weight(GAUGE_COLUMN_WEIGHT).fillMaxHeight(),
+                        modifier = Modifier.weight(GAUGE_COLUMN_WEIGHT).fillMaxHeight()
+                            .padding(end = if (compact) 0.dp else 20.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         PvArcGauge(
