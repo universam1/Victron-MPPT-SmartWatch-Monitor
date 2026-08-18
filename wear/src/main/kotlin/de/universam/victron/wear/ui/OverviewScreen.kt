@@ -143,6 +143,15 @@ private fun DeviceCard(snapshot: DeviceSnapshot, now: Long, onClick: () -> Unit)
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (snapshot.displayName != snapshot.modelName) {
+                Text(
+                    text = snapshot.modelName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             when (snapshot.status) {
                 SnapshotStatus.DECODED -> {

@@ -68,7 +68,10 @@ public data class DeviceSnapshot(
     val observedPvPeakW: Int = 0,
 ) {
     /** What to call this device in the UI. */
-    public val displayName: String get() = label?.takeIf { it.isNotBlank() } ?: modelName
+    public val displayName: String get() =
+        label?.takeIf { it.isNotBlank() }
+            ?: bleName?.takeIf { it.isNotBlank() }
+            ?: modelName
 
     public fun ageMillis(nowEpochMillis: Long): Long = (nowEpochMillis - receivedAtEpochMillis).coerceAtLeast(0)
 

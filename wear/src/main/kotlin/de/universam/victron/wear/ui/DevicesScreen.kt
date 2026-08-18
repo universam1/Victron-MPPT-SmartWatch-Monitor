@@ -49,6 +49,14 @@ fun DevicesScreen(
                 val hasKey = config.keyFor(snapshot.address) != null
                 Card(onClick = { onEditKey(snapshot.address) }, modifier = Modifier.fillMaxWidth()) {
                     Text(text = snapshot.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    if (snapshot.displayName != snapshot.modelName) {
+                        Text(
+                            text = snapshot.modelName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
                     Text(
                         text = snapshot.address,
                         style = MaterialTheme.typography.labelSmall,

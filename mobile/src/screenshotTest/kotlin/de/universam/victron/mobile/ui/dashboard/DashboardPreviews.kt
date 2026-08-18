@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -50,10 +51,10 @@ private val sampleCharger = SolarChargerValues(
 
 private val sampleSnapshot = DeviceSnapshot(
     address = "AA:BB:CC:DD:EE:FF",
-    bleName = "SmartSolar 100|30",
-    label = "Roof Array",
+    bleName = "MobiBlue",
+    label = null,
     modelId = 0xA060,
-    modelName = "SmartSolar 100|30",
+    modelName = "SmartSolar MPPT 100/20-48V",
     recordTypeCode = 1,
     recordLabel = "Solar Charger",
     rssi = -65,
@@ -181,7 +182,12 @@ fun PreviewDeviceDashboardEmpty() {
 @Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 300, heightDp = 300)
 @Composable
 fun PreviewPvArcGauge() {
-    Box(modifier = Modifier.size(300.dp).background(BG_BRUSH).padding(16.dp)) {
+    // Centred: the gauge is wider than it is tall, so a top-aligned box would pile all the slack
+    // under it and read as a layout bug rather than as the empty bottom of the arc.
+    Box(
+        modifier = Modifier.size(300.dp).background(BG_BRUSH).padding(16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         PvArcGauge(
             fraction = 0.37f,
             watts = 142,

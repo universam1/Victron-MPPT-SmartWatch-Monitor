@@ -343,6 +343,13 @@ private fun DeviceCard(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(text = snapshot.displayName, style = MaterialTheme.typography.titleMedium)
+            if (snapshot.displayName != snapshot.modelName) {
+                Text(
+                    text = snapshot.modelName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 text = "${snapshot.address} · ${snapshot.rssi} dBm · ${Formatting.age(snapshot, now)}",
                 style = MaterialTheme.typography.labelMedium,

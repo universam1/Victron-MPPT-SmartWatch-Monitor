@@ -112,9 +112,17 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   range. Do not put them back behind an "empty state" that replaces the screen.
 - **The phone dashboard is laid out by window shape, not orientation** (`BoxWithConstraints`,
   `maxWidth > maxHeight`): one scrolling column when tall, two columns with a height-sized gauge
-  (`PvArcGauge(matchHeightFirst = true)`) when wide. Both arrangements call the *same*
-  `DashboardHeader`/`ValueTiles`/`PvArcGauge` — don't fork them into two layouts that drift.
-  Deriving the square gauge from the width in landscape is the bug this replaced.
+  (`PvArcGauge(matchHeightFirst = true)`) when wide, where the header also puts the model name
+  beside the device name rather than under it (`DashboardHeader(singleLine = true)`). Both
+  arrangements call the *same* `DashboardHeader`/`ValueTiles`/`PvArcGauge` — don't fork them into two
+  layouts that drift. Deriving the square gauge from the width in landscape is the bug this replaced.
+- **`PvArcGauge` reserves 0.8 of its diameter in height, not a full square** (`ARC_HEIGHT_FRACTION`):
+  the 240° arc's tips sit half a radius below the centre, so a square box always ended in an empty
+  band, and that band pushed the bottom tiles off a portrait screen. The circle hangs from the top of
+  the box — which is why the sweep gradient and the rotation pivot use the computed `arcCenter` and
+  not the DrawScope `center`, and why the value text is offset down into it. **Never give the gauge a
+  fixed height** (`fillMaxHeight`/`fillMaxSize` inside a bounded box): that leaves its aspect ratio no
+  way to also honour the width, and it overflows its column instead of shrinking.
 - **The phone app is edge-to-edge**: gradients may run behind the system bars, content must be
   inset (`safeDrawingPadding`), or a landscape navigation bar and display cutouts clip it.
 - **The hero gauge item is sized with `Modifier.fillParentMaxSize()`** (the `ScalingLazyListItemScope`

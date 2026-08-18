@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
@@ -102,6 +103,9 @@ fun DeviceDashboard(
                 now = now,
                 stale = stale,
                 onOpenSetup = onOpenSetup,
+                // Two columns means width to spare and height to save: the model name goes beside
+                // the device name rather than under it.
+                singleLine = twoColumn,
             )
 
             if (twoColumn) {
@@ -115,6 +119,9 @@ fun DeviceDashboard(
                         modifier = Modifier.weight(GAUGE_COLUMN_WEIGHT).fillMaxHeight(),
                         contentAlignment = Alignment.Center,
                     ) {
+                        // No size modifier: a fixed height would leave the gauge's aspect ratio no
+                        // way to also honour the column width, and it would overflow into the
+                        // readings. The Box above centres whatever size it settles on.
                         PvArcGauge(
                             fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
                             watts = values?.pvPowerW,
@@ -122,7 +129,6 @@ fun DeviceDashboard(
                             stale = stale,
                             sparklineValues = history?.pvPowerW.orEmpty(),
                             matchHeightFirst = true,
-                            modifier = Modifier.fillMaxHeight(),
                         )
                     }
 
@@ -180,13 +186,17 @@ fun DeviceDashboard(
     }
 }
 
-/** Device name, age and the button into setup. Identical in both arrangements. */
+/**
+ * Device name, age and the button into setup. Same content in both arrangements; [singleLine] only
+ * decides whether the model name sits beside the device name or under it.
+ */
 @Composable
 private fun DashboardHeader(
     snapshot: DeviceSnapshot?,
     now: Long,
     stale: Boolean,
     onOpenSetup: (() -> Unit)?,
+    singleLine: Boolean = false,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
@@ -194,12 +204,46 @@ private fun DashboardHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = snapshot?.displayName ?: stringResource(R.string.no_device),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = TEXT_PRIMARY,
-            )
+            val name: @Composable () -> Unit = {
+                Text(
+                    text = snapshot?.displayName ?: stringResource(R.string.no_device),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TEXT_PRIMARY,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (singleLine) Modifier.alignByBaseline() else Modifier,
+                )
+            }
+            // Only worth showing when it says something the name does not.
+            val model = snapshot?.modelName?.takeIf { it != snapshot.displayName }
+            val modelText: @Composable () -> Unit = {
+                Text(
+                    text = model.orEmpty(),
+                    fontSize = 14.sp,
+                    color = TEXT_DIM,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (singleLine) Modifier.alignByBaseline() else Modifier,
+                )
+            }
+
+            if (singleLine) {
+                // Baseline alignment, so the 14sp model name sits on the same line as the 20sp
+                // device name instead of floating against its cap height.
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    name()
+                    if (model != null) modelText()
+                }
+            } else {
+                Column(modifier = Modifier.weight(1f)) {
+                    name()
+                    if (model != null) modelText()
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = snapshot?.let { Formatting.age(it, now) } ?: Formatting.PLACEHOLDER,

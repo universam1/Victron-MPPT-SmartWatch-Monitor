@@ -42,10 +42,10 @@ private val sampleCharger = SolarChargerValues(
 
 private val sampleSnapshot = DeviceSnapshot(
     address = "AA:BB:CC:DD:EE:FF",
-    bleName = "SmartSolar 100|30",
-    label = "Roof Array",
+    bleName = "MobiBlue",
+    label = null,
     modelId = 0xA060,
-    modelName = "SmartSolar 100|30",
+    modelName = "SmartSolar MPPT 100/20-48V",
     recordTypeCode = 1,
     recordLabel = "Solar Charger",
     rssi = -65,
