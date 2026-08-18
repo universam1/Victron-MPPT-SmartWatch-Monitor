@@ -113,19 +113,21 @@ fun PvArcGauge(
                         style = stroke,
                     )
                 } else {
-                    // Heat gradient: yellow → orange → red along the arc
+                    // Heat gradient: white → yellow → orange → red along the arc
                     val arcFraction = SWEEP_ANGLE / 360f
                     val heatLow = Color(VictronPalette.HEAT_LOW)
+                    val heatMidLow = Color(VictronPalette.HEAT_MID_LOW)
                     val heatMid = Color(VictronPalette.HEAT_MID)
                     val heatHigh = Color(VictronPalette.HEAT_HIGH)
                     val stops = arrayOf(
                         0f to heatLow,
-                        arcFraction * 0.5f to heatMid,
+                        arcFraction * 0.33f to heatMidLow,
+                        arcFraction * 0.66f to heatMid,
                         arcFraction to heatHigh,
                         1f to heatHigh,
                     )
                     val brush = Brush.sweepGradient(colorStops = stops, center = center)
-                    val glowColor = heatLow.copy(alpha = 0.35f)
+                    val glowColor = heatMidLow.copy(alpha = 0.35f)
 
                     // Butt caps for gradient + round-cap dots at endpoints for clean edges.
                     // Glow keeps Round caps since it's a single color.
@@ -166,8 +168,9 @@ fun PvArcGauge(
                         // End cap — lerp color at the tip position
                         val tipFrac = animated.coerceIn(0f, 1f)
                         val tipColor = when {
-                            tipFrac < 0.5f -> androidx.compose.ui.graphics.lerp(heatLow, heatMid, tipFrac * 2f)
-                            else -> androidx.compose.ui.graphics.lerp(heatMid, heatHigh, (tipFrac - 0.5f) * 2f)
+                            tipFrac < 0.33f -> androidx.compose.ui.graphics.lerp(heatLow, heatMidLow, tipFrac / 0.33f)
+                            tipFrac < 0.66f -> androidx.compose.ui.graphics.lerp(heatMidLow, heatMid, (tipFrac - 0.33f) / 0.33f)
+                            else -> androidx.compose.ui.graphics.lerp(heatMid, heatHigh, (tipFrac - 0.66f) / 0.34f)
                         }
                         drawArc(
                             color = tipColor,

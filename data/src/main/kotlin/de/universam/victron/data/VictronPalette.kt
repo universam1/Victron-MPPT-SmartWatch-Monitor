@@ -18,7 +18,8 @@ public object VictronPalette {
     public const val ERROR: Int = 0xFFFF6B6B.toInt()
 
     // Heat-gradient stops for the PV arc (low → mid → high power)
-    public const val HEAT_LOW: Int = 0xFFFFC531.toInt()    // SOLAR yellow
+    public const val HEAT_LOW: Int = 0xFFFFFFFF.toInt()    // white
+    public const val HEAT_MID_LOW: Int = 0xFFFFC531.toInt() // SOLAR yellow
     public const val HEAT_MID: Int = 0xFFFF8C00.toInt()    // dark orange
     public const val HEAT_HIGH: Int = 0xFFFF3D00.toInt()   // fire-red
 

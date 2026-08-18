@@ -320,6 +320,7 @@ internal fun GaugeFace(
             modifier = Modifier.fillMaxSize(),
             gradientColors = if (stale) null else listOf(
                 Color(VictronPalette.HEAT_LOW),
+                Color(VictronPalette.HEAT_MID_LOW),
                 Color(VictronPalette.HEAT_MID),
                 Color(VictronPalette.HEAT_HIGH),
             ),

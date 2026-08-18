@@ -43,7 +43,7 @@ private val sampleCharger = SolarChargerValues(
     chargerErrorCode = 0,
     batteryVoltage = 13.42,
     batteryCurrent = 4.2,
-    pvPowerW = 142,
+    pvPowerW = 320,
     yieldTodayWh = 847,
     loadCurrent = 1.2,
 )
