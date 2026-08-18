@@ -130,16 +130,16 @@ fun DeviceDashboard(
                         modifier = Modifier
                             .weight(1f - GAUGE_COLUMN_WEIGHT)
                             .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                            .then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                        verticalArrangement = if (compact) Arrangement.spacedBy(10.dp) else Arrangement.SpaceEvenly,
                     ) {
                         CurrentBar(
                             amps = values?.batteryCurrent,
                             stale = stale,
                             sparklineValues = history?.batteryCurrent.orEmpty(),
                             // Vertical space is scarce on a phone landscape;
-                            // head units (>=500dp tall) get the full sparkline.
-                            sparklineHeight = if (compact) 36.dp else 72.dp,
+                            // head units (>=500dp tall) get a moderate sparkline.
+                            sparklineHeight = if (compact) 36.dp else 48.dp,
                         )
                         ValueTiles(
                             values = values,
