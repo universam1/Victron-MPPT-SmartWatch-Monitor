@@ -301,8 +301,8 @@ private fun ValueTiles(
                     fontSize = if (compact) 18.sp else 28.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = chipColor,
-                    textAlign = if (compact) TextAlign.Start else TextAlign.End,
-                    modifier = if (compact) Modifier.padding(top = 2.dp) else Modifier.fillMaxWidth().padding(top = 2.dp),
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
             }
         }
