@@ -58,7 +58,7 @@ private val SURFACE_LIGHT = Color(0xFF1A2940)
 private const val FALLBACK_SCALE_W = 50
 
 /** Share of the width the gauge gets in the two-column (landscape) arrangement. */
-private const val GAUGE_COLUMN_WEIGHT = 0.45f
+private const val GAUGE_COLUMN_WEIGHT = 0.40f
 
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
@@ -112,8 +112,7 @@ fun DeviceDashboard(
                     // The gauge is square and follows the height here — in landscape the width is
                     // the abundant dimension, and matching it would push everything else off screen.
                     Box(
-                        modifier = Modifier.weight(GAUGE_COLUMN_WEIGHT).fillMaxHeight()
-                            .padding(end = if (compact) 0.dp else 20.dp),
+                        modifier = Modifier.weight(GAUGE_COLUMN_WEIGHT).fillMaxHeight(),
                         contentAlignment = Alignment.Center,
                     ) {
                         PvArcGauge(
@@ -302,8 +301,8 @@ private fun ValueTiles(
                     fontSize = if (compact) 18.sp else 28.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = chipColor,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    textAlign = if (compact) TextAlign.Start else TextAlign.End,
+                    modifier = if (compact) Modifier.padding(top = 2.dp) else Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
             }
         }
