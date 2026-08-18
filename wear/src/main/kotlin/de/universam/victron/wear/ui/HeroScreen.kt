@@ -73,7 +73,6 @@ fun HeroScreen(
     ScanWhileVisible(viewModel)
 
     val snapshots = collect(viewModel.snapshots)
-    val config = collect(viewModel.config)
     val scanState = collect(viewModel.scanState)
     val now = rememberNow()
 
@@ -112,9 +111,6 @@ fun HeroScreen(
 
     HeroContent(
         snapshot = selected,
-        peakWatts = selected?.let { config.pvPeakWattsFor(it.address) } ?: 0,
-        batteryCurrentMax = selected?.let { config.batteryCurrentMaxFor(it.address) }
-            ?: config.batteryCurrentMaxFor(""),
         now = now,
         deviceCount = decoded.size,
         status = status,
@@ -133,8 +129,6 @@ fun HeroScreen(
 @Composable
 internal fun HeroContent(
     snapshot: DeviceSnapshot?,
-    peakWatts: Int,
-    batteryCurrentMax: Double,
     now: Long,
     deviceCount: Int = 0,
     status: String? = null,
@@ -164,8 +158,6 @@ internal fun HeroContent(
             item {
                 GaugeFace(
                     snapshot = snapshot,
-                    peakWatts = peakWatts,
-                    batteryCurrentMax = batteryCurrentMax,
                     now = now,
                     deviceCount = deviceCount,
                     onCycleDevice = onCycleDevice,
@@ -294,8 +286,6 @@ internal fun HeroContent(
 @Composable
 internal fun GaugeFace(
     snapshot: DeviceSnapshot?,
-    peakWatts: Int,
-    batteryCurrentMax: Double,
     now: Long,
     deviceCount: Int = 1,
     onCycleDevice: () -> Unit = {},
@@ -314,7 +304,7 @@ internal fun GaugeFace(
         contentAlignment = Alignment.Center,
     ) {
         PowerArc(
-            fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
+            fraction = snapshot?.pvFraction() ?: 0f,
             color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
@@ -326,7 +316,7 @@ internal fun GaugeFace(
             ),
         )
         PowerArc(
-            fraction = snapshot?.batteryCurrentFraction(batteryCurrentMax) ?: 0f,
+            fraction = snapshot?.batteryCurrentFraction() ?: 0f,
             color = currentColor,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),

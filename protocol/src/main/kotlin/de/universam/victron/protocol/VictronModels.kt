@@ -15,6 +15,18 @@ public object VictronModels {
 
     public fun isKnown(modelId: Int): Boolean = NAMES.containsKey(modelId)
 
+    /**
+     * Maximum charge current in A, read out of the model name: a solar charger is always named
+     * `MPPT <open circuit volts>/<max amps>`, so `MPPT 100/20 48V` is a 20 A unit. `null` for
+     * anything that is not an MPPT — the `MPPT` anchor is what keeps `SmartShunt 500A/50mV` and
+     * `Smart Lithium 12.8V/90Ah` from being misread as a current rating.
+     */
+    public fun maxChargeCurrentA(modelId: Int): Int? =
+        NAMES[modelId]?.let { MPPT_MAX_AMPS.find(it) }?.groupValues?.get(1)?.toIntOrNull()
+
+    /** `\D*` swallows the `VE.Can ` / `RS ` infixes of the bigger models. */
+    private val MPPT_MAX_AMPS = Regex("""MPPT\D*\d+/(\d+)""")
+
     private val NAMES: Map<Int, String> = mapOf(
         // BlueSolar MPPT
         0xA040 to "BlueSolar MPPT 75/50",

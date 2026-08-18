@@ -34,7 +34,8 @@ import de.universam.victron.data.VictronPalette
 import de.universam.victron.mobile.R
 import kotlin.math.abs
 
-private const val MAX_AMPS = 30f
+/** Full scale when there is no device to read a rating or a peak from. */
+private const val FALLBACK_MAX_AMPS = 30.0
 private val TRACK = Color(0xFF1A2332)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 
@@ -42,18 +43,22 @@ private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
  * Horizontal animated bar gauge for battery current. Green when charging, orange when discharging,
  * dimmed when stale. Includes a glow layer and vertical gradient for depth, plus optional sparkline.
  *
+ * [maxAmps] is the charger's rating (or the highest current seen); `null` means no device yet.
+ *
  * [sparklineHeight] trades trend detail for vertical space — a landscape layout has less of the
  * latter than a portrait one.
  */
 @Composable
 fun CurrentBar(
     amps: Double?,
+    maxAmps: Double?,
     stale: Boolean,
     modifier: Modifier = Modifier,
     sparklineValues: List<Float> = emptyList(),
     sparklineHeight: Dp = 72.dp,
 ) {
-    val fraction = ((abs(amps ?: 0.0) / MAX_AMPS).coerceIn(0.0, 1.0)).toFloat()
+    val scale = maxAmps ?: FALLBACK_MAX_AMPS
+    val fraction = ((abs(amps ?: 0.0) / scale).coerceIn(0.0, 1.0)).toFloat()
     val animated by animateFloatAsState(
         targetValue = fraction,
         animationSpec = tween(durationMillis = 600),

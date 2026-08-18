@@ -110,22 +110,6 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         }
     }
 
-    /** Full scale of the power arc in watts; `0` derives it from the highest power seen. */
-    public fun setPvPeakWatts(address: String, watts: Int) {
-        val existing = config.value.deviceFor(address) ?: return
-        viewModelScope.launch {
-            repository.upsertDevice(existing.copy(pvPeakWatts = watts.coerceAtLeast(0)))
-        }
-    }
-
-    /** Full scale of the battery current arc in amps. */
-    public fun setBatteryCurrentMax(address: String, amps: Double) {
-        val existing = config.value.deviceFor(address) ?: return
-        viewModelScope.launch {
-            repository.upsertDevice(existing.copy(batteryCurrentMax = amps.coerceAtLeast(1.0)))
-        }
-    }
-
     /**
      * Starts scanning until [stopLiveScan] or the ViewModel dies. Safe to call repeatedly.
      *

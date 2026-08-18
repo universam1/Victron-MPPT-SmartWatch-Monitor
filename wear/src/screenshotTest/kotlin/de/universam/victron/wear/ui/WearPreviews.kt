@@ -45,7 +45,7 @@ private val sampleSnapshot = DeviceSnapshot(
     bleName = "MobiBlue",
     label = null,
     modelId = 0xA060,
-    modelName = "SmartSolar MPPT 100/20-48V",
+    modelName = "SmartSolar MPPT 100/20 48V",
     recordTypeCode = 1,
     recordLabel = "Solar Charger",
     rssi = -65,
@@ -105,8 +105,6 @@ fun PreviewWatchFace() {
     Box(modifier = Modifier.size(240.dp)) {
         GaugeFace(
             snapshot = sampleSnapshot,
-            peakWatts = 380,
-            batteryCurrentMax = 15.0,
             now = System.currentTimeMillis(),
         )
     }
@@ -120,8 +118,6 @@ fun PreviewHero() {
     Box(modifier = Modifier.size(240.dp)) {
         HeroContent(
             snapshot = sampleSnapshot,
-            peakWatts = 380,
-            batteryCurrentMax = 15.0,
             now = System.currentTimeMillis(),
             deviceCount = 1,
         )
@@ -136,8 +132,6 @@ fun PreviewHeroEmpty() {
     Box(modifier = Modifier.size(240.dp)) {
         HeroContent(
             snapshot = null,
-            peakWatts = 0,
-            batteryCurrentMax = 15.0,
             now = System.currentTimeMillis(),
             status = "No Victron device yet",
         )

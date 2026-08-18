@@ -72,7 +72,7 @@ string is rendered as text rather than as a dynamic expression, which keeps the 
 ## Phone ↔ watch sync (companion mode)
 
 Typing a 32 character key on a watch is a punishment, so the phone app is a real companion: the
-device list — addresses, labels, keys, array size — travels over the **Wear OS Data Layer**.
+device list — addresses, labels, keys — travels over the **Wear OS Data Layer**.
 
 ```
 phone app ──DataClient.putDataItem("/victron/devices")──▶ Data Layer ──▶ ConfigSyncListenerService
@@ -120,9 +120,12 @@ Colours come from one place, `data/VictronPalette.kt`, as ARGB ints, because the
 about Compose: yellow = solar, blue = battery, green = current going in, orange = current going out,
 red = charger error, dim grey = "no value" or stale.
 
-The arc's full scale is the array size if you configured one (phone app), otherwise the highest
-power ever seen from that device, rounded up to a step a human would draw — with a 50 W floor, so
-3 W on a dark morning does not look like a full array.
+The arc's full scale comes from the model name: every charger is called `MPPT <volts>/<amps>`, so
+a *SmartSolar MPPT 100/20* is a 20 A unit and can push at most 20 A × the battery voltage into the
+battery. That product is the watts scale, the rating itself is the current arc's scale, and nothing
+has to be configured. For a model id that is not in the table there is still the old fallback: the
+highest value ever seen from that device, rounded up to a step a human would draw — with a 50 W
+floor, so 3 W on a dark morning does not look like a full array.
 
 ## Phone UI
 

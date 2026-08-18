@@ -61,7 +61,7 @@ adb connect <watch-ip>:5555      # watch: enable Wi-Fi debugging first
 ```
 
 Easiest path: **enter the key once in the phone app** — paste it, done — and it syncs to the watch
-over the Wear OS Data Layer, together with the device label and array size. Grant Bluetooth
+over the Wear OS Data Layer, together with the device label. Grant Bluetooth
 scanning on both, then add the tile on the watch via *press and hold the watch face → Tiles → +*.
 
 The watch also works entirely on its own: it lists every Victron device in range even without a key
@@ -81,7 +81,7 @@ The watch also works entirely on its own: it lists every Victron device in range
 | Yield today | Wh below 1 kWh, kWh above |
 | Load output | on models that have one |
 | Age | how old the reading is — always visible |
-| Gauge scale | your array size in W, or automatically the highest power seen so far |
+| Gauge scale | from the model name — a *MPPT 100/20* is a 20 A charger, so its scales are 20 A and 20 A × battery volts |
 
 Other Victron devices (SmartShunt, Lynx Smart BMS, BatteryProtect, …) are **discovered and
 decrypted**, but their record types are not decoded into values yet; the *Raw data* screen shows

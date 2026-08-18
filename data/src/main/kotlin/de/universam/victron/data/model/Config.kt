@@ -13,13 +13,6 @@ public data class DeviceConfig(
     val label: String? = null,
     /** Show this device on the tile. */
     val showOnTile: Boolean = true,
-    /**
-     * Full scale of the power arc in watts. `0` means "derive it from the highest power seen so
-     * far", which is what most people want without having to know their array size.
-     */
-    val pvPeakWatts: Int = 0,
-    /** Full scale of the battery current arc in amps. Default 15 A. */
-    val batteryCurrentMax: Double = 15.0,
     /** When this entry was last changed, used to resolve phone/watch sync conflicts. */
     val updatedAtEpochMillis: Long = 0,
 )
@@ -43,10 +36,6 @@ public data class AppConfig(
     public fun keyFor(address: String): String? = deviceFor(address)?.advertisementKeyHex
 
     public fun labelFor(address: String): String? = deviceFor(address)?.label
-
-    public fun pvPeakWattsFor(address: String): Int = deviceFor(address)?.pvPeakWatts ?: 0
-
-    public fun batteryCurrentMaxFor(address: String): Double = deviceFor(address)?.batteryCurrentMax ?: 15.0
 
     public val tileAddresses: List<String>
         get() = devices.filter { it.showOnTile }.map { it.address }

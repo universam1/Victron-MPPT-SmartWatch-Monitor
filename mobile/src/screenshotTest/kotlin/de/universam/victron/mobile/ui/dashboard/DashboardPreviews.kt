@@ -25,7 +25,7 @@ private val BG_BRUSH = Brush.verticalGradient(listOf(Color(0xFF0A1628), Color(0x
 
 // Sample sparkline data — a gentle wave pattern
 private val sampleSparkline = (0 until 30).map { i ->
-    (kotlin.math.sin(i * 0.4) * 2.0 + 4.2).toFloat()
+    (kotlin.math.sin(i * 0.4) * 2.0 + 22.0).toFloat()
 }
 private val sampleVoltageSparkline = (0 until 30).map { i ->
     (kotlin.math.sin(i * 0.3) * 0.3 + 13.4).toFloat()
@@ -43,7 +43,7 @@ private val sampleCharger = SolarChargerValues(
     chargerErrorLabel = null,
     chargerErrorCode = 0,
     batteryVoltage = 13.42,
-    batteryCurrent = 4.2,
+    batteryCurrent = 22.0,
     pvPowerW = 320,
     yieldTodayWh = 847,
     loadCurrent = 1.2,
@@ -53,8 +53,8 @@ private val sampleSnapshot = DeviceSnapshot(
     address = "AA:BB:CC:DD:EE:FF",
     bleName = "MobiBlue",
     label = null,
-    modelId = 0xA060,
-    modelName = "SmartSolar MPPT 100/20-48V",
+    modelId = 0xA056,
+    modelName = "SmartSolar MPPT 100/30",
     recordTypeCode = 1,
     recordLabel = "Solar Charger",
     rssi = -65,
@@ -82,7 +82,6 @@ fun PreviewDeviceDashboard() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = sampleSnapshot,
-            peakWatts = 380,
             now = System.currentTimeMillis(),
             history = history,
         )
@@ -96,7 +95,6 @@ fun PreviewDeviceDashboardStale() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = staleSnapshot,
-            peakWatts = 380,
             now = System.currentTimeMillis(),
         )
     }
@@ -117,7 +115,6 @@ fun PreviewDeviceDashboardLandscape() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = sampleSnapshot,
-            peakWatts = 380,
             now = System.currentTimeMillis(),
             history = history,
             onOpenSetup = {},
@@ -133,7 +130,6 @@ fun PreviewDeviceDashboardLandscapeEmpty() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = null,
-            peakWatts = 0,
             now = System.currentTimeMillis(),
             onOpenSetup = {},
         )
@@ -155,7 +151,6 @@ fun PreviewDeviceDashboardHeadUnit() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = sampleSnapshot,
-            peakWatts = 380,
             now = System.currentTimeMillis(),
             history = history,
             onOpenSetup = {},
@@ -171,7 +166,6 @@ fun PreviewDeviceDashboardEmpty() {
     Box(modifier = Modifier.fillMaxSize().background(BG_BRUSH)) {
         DeviceDashboard(
             snapshot = null,
-            peakWatts = 0,
             now = System.currentTimeMillis(),
             onOpenSetup = {},
         )
@@ -189,9 +183,9 @@ fun PreviewPvArcGauge() {
         contentAlignment = Alignment.Center,
     ) {
         PvArcGauge(
-            fraction = 0.37f,
-            watts = 142,
-            scaleMaxW = 380,
+            fraction = 0.79f,
+            watts = 320,
+            scaleMaxW = 403,
             stale = false,
         )
     }
@@ -202,7 +196,7 @@ fun PreviewPvArcGauge() {
 @Composable
 fun PreviewCurrentBarCharging() {
     Box(modifier = Modifier.fillMaxWidth().height(80.dp).background(BG_BRUSH).padding(16.dp)) {
-        CurrentBar(amps = 4.2, stale = false)
+        CurrentBar(amps = 22.0, maxAmps = 30.0, stale = false)
     }
 }
 
@@ -211,6 +205,6 @@ fun PreviewCurrentBarCharging() {
 @Composable
 fun PreviewCurrentBarDischarging() {
     Box(modifier = Modifier.fillMaxWidth().height(80.dp).background(BG_BRUSH).padding(16.dp)) {
-        CurrentBar(amps = -2.8, stale = false)
+        CurrentBar(amps = -2.8, maxAmps = 30.0, stale = false)
     }
 }

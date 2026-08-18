@@ -55,7 +55,7 @@ private val TRACK = Color(0xFF1A2332)
 private val SURFACE = Color(0xFF121E2E)
 private val SURFACE_LIGHT = Color(0xFF1A2940)
 
-/** Full scale of the gauge when there is no device and no configured array size yet. */
+/** Full scale of the gauge when there is no device to read a rating or a peak from. */
 private const val FALLBACK_SCALE_W = 50
 
 /** Share of the width the gauge gets in the two-column (landscape) arrangement. */
@@ -76,7 +76,6 @@ private const val GAUGE_COLUMN_WEIGHT = 0.50f
 @Composable
 fun DeviceDashboard(
     snapshot: DeviceSnapshot?,
-    peakWatts: Int,
     now: Long,
     modifier: Modifier = Modifier,
     history: ReadingHistory? = null,
@@ -84,7 +83,7 @@ fun DeviceDashboard(
 ) {
     val values = snapshot?.solarCharger
     val stale = snapshot != null && Formatting.isStale(snapshot, now)
-    val scaleMax = snapshot?.pvScaleMaxW(peakWatts) ?: peakWatts.coerceAtLeast(FALLBACK_SCALE_W)
+    val scaleMax = snapshot?.pvScaleMaxW() ?: FALLBACK_SCALE_W
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val twoColumn = maxWidth > maxHeight
@@ -123,7 +122,7 @@ fun DeviceDashboard(
                         // way to also honour the column width, and it would overflow into the
                         // readings. The Box above centres whatever size it settles on.
                         PvArcGauge(
-                            fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
+                            fraction = snapshot?.pvFraction() ?: 0f,
                             watts = values?.pvPowerW,
                             scaleMaxW = scaleMax,
                             stale = stale,
@@ -141,6 +140,7 @@ fun DeviceDashboard(
                     ) {
                         CurrentBar(
                             amps = values?.batteryCurrent,
+                            maxAmps = snapshot?.batteryCurrentMaxA(),
                             stale = stale,
                             sparklineValues = history?.batteryCurrent.orEmpty(),
                             // Vertical space is scarce on a phone landscape;
@@ -165,7 +165,7 @@ fun DeviceDashboard(
                 ) {
                     // PV Arc Gauge — dominant visual, with sparkline inside
                     PvArcGauge(
-                        fraction = snapshot?.pvFraction(peakWatts) ?: 0f,
+                        fraction = snapshot?.pvFraction() ?: 0f,
                         watts = values?.pvPowerW,
                         scaleMaxW = scaleMax,
                         stale = stale,
@@ -175,6 +175,7 @@ fun DeviceDashboard(
 
                     CurrentBar(
                         amps = values?.batteryCurrent,
+                        maxAmps = snapshot?.batteryCurrentMaxA(),
                         stale = stale,
                         sparklineValues = history?.batteryCurrent.orEmpty(),
                     )

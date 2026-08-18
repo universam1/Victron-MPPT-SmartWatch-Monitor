@@ -2,9 +2,12 @@ package de.universam.victron.data.model
 
 import de.universam.victron.protocol.DecodeResult
 import de.universam.victron.protocol.VictronHeader
+import de.universam.victron.protocol.VictronModels
 import de.universam.victron.protocol.records.SolarChargerRecord
 import de.universam.victron.protocol.records.UnknownRecord
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** How much of an advertisement we were able to make sense of. */
 public enum class SnapshotStatus {
@@ -64,8 +67,10 @@ public data class DeviceSnapshot(
     val solarCharger: SolarChargerValues? = null,
     /** Decrypted payload of a record type we cannot decode yet, as hex. */
     val payloadHex: String? = null,
-    /** Highest PV power ever seen from this device, used to scale the power arc automatically. */
+    /** Highest PV power ever seen from this device, the fallback scale for the power arc. */
     val observedPvPeakW: Int = 0,
+    /** Highest battery current ever seen, the fallback scale for the current arc. */
+    val observedCurrentPeakA: Double = 0.0,
 ) {
     /** What to call this device in the UI. */
     public val displayName: String get() =
@@ -75,23 +80,50 @@ public data class DeviceSnapshot(
 
     public fun ageMillis(nowEpochMillis: Long): Long = (nowEpochMillis - receivedAtEpochMillis).coerceAtLeast(0)
 
-    /** Keeps values that survive a single advertisement, like the observed peak. */
+    /** Keeps values that survive a single advertisement, like the observed peaks. */
     public fun carryOver(previous: DeviceSnapshot?): DeviceSnapshot {
-        val peak = maxOf(
+        val peakW = maxOf(
             previous?.observedPvPeakW ?: 0,
             observedPvPeakW,
             solarCharger?.pvPowerW ?: 0,
         )
-        return if (peak == observedPvPeakW) this else copy(observedPvPeakW = peak)
+        val peakA = maxOf(
+            previous?.observedCurrentPeakA ?: 0.0,
+            observedCurrentPeakA,
+            solarCharger?.batteryCurrent?.let { abs(it) } ?: 0.0,
+        )
+        return if (peakW == observedPvPeakW && peakA == observedCurrentPeakA) {
+            this
+        } else {
+            copy(observedPvPeakW = peakW, observedCurrentPeakA = peakA)
+        }
+    }
+
+    /** Maximum charge current in A the model name promises; `null` for an unknown model. */
+    public val maxChargeCurrentA: Int? get() = VictronModels.maxChargeCurrentA(modelId)
+
+    /**
+     * Full scale of the current arc. The charger's rating wins — a 100/20 can never push more than
+     * 20 A. Only when the model is unknown do we fall back to the highest current seen, rounded up,
+     * with a floor so a trickle does not look like a full charge (and never a division by zero).
+     */
+    public fun batteryCurrentMaxA(): Double {
+        maxChargeCurrentA?.let { return it.toDouble() }
+        val observed = maxOf(observedCurrentPeakA, solarCharger?.batteryCurrent?.let { abs(it) } ?: 0.0)
+        return kotlin.math.ceil(maxOf(observed, MIN_SCALE_A) / 5.0) * 5.0
     }
 
     /**
-     * Full scale of the power arc. A configured peak wins; otherwise the highest power seen so far
-     * is rounded up to something a human would draw a scale to, with a 50 W floor so a dark morning
-     * does not make 3 W look like a full array.
+     * Full scale of the power arc. The charger's rating wins: max charge current × battery voltage
+     * is the most power it can put into the battery. Only when the model is unknown or nothing has
+     * been decoded yet do we fall back to the highest power seen so far, rounded up to something a
+     * human would draw a scale to, with a 50 W floor so a dark morning does not make 3 W look like
+     * a full array.
      */
-    public fun pvScaleMaxW(configuredPeakWatts: Int): Int {
-        if (configuredPeakWatts > 0) return configuredPeakWatts
+    public fun pvScaleMaxW(): Int {
+        val amps = maxChargeCurrentA
+        val volts = solarCharger?.batteryVoltage
+        if (amps != null && volts != null) return (amps * volts).roundToInt()
         val observed = maxOf(observedPvPeakW, solarCharger?.pvPowerW ?: 0, MIN_SCALE_W)
         val step = when {
             observed <= 100 -> 50
@@ -103,20 +135,20 @@ public data class DeviceSnapshot(
     }
 
     /** 0..1 for the power arc. */
-    public fun pvFraction(configuredPeakWatts: Int): Float {
+    public fun pvFraction(): Float {
         val power = solarCharger?.pvPowerW ?: return 0f
-        val scale = pvScaleMaxW(configuredPeakWatts)
-        return (power.toFloat() / scale).coerceIn(0f, 1f)
+        return (power.toFloat() / pvScaleMaxW()).coerceIn(0f, 1f)
     }
 
     /** 0..1 for the battery current arc. */
-    public fun batteryCurrentFraction(maxAmps: Double): Float {
+    public fun batteryCurrentFraction(): Float {
         val current = solarCharger?.batteryCurrent ?: return 0f
-        return (kotlin.math.abs(current) / maxAmps).coerceIn(0.0, 1.0).toFloat()
+        return (abs(current) / batteryCurrentMaxA()).coerceIn(0.0, 1.0).toFloat()
     }
 
     public companion object {
         private const val MIN_SCALE_W = 50
+        private const val MIN_SCALE_A = 5.0
 
         public fun from(
             address: String,

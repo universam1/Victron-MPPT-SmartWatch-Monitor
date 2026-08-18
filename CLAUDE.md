@@ -104,8 +104,12 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 - **Config sync is a per-device last-write-wins union** (`AppConfig.mergeDevices`). Do not "fix" it
   into a wholesale replace: that lets one device wipe the other's keys. Removals are intentionally
   not propagated; `backgroundScanEnabled`/scan window stay local per device.
-- The gauge scale comes from `DeviceSnapshot.pvScaleMaxW`: configured array size, else the observed
-  peak rounded up, floor 50 W. `carryOver` must keep `observedPvPeakW` across advertisements.
+- **The gauge scales are derived from the model, not configured.** A charger's name carries its
+  rating (`MPPT 100/20` → 20 A), so `VictronModels.maxChargeCurrentA` is the current arc's full
+  scale and `rating × battery voltage` is `pvScaleMaxW` — the most power that charger can put into
+  the battery. Only an unknown model falls back to the observed peak rounded up (floor 50 W / 5 A),
+  and `carryOver` must keep `observedPvPeakW`/`observedCurrentPeakA` across advertisements. There is
+  deliberately no user setting for either scale: the device already knows.
 - **The hero/dashboard surfaces render without a device.** `HeroContent` and `DeviceDashboard` take a
   nullable snapshot: no device means `–` everywhere and arcs at zero, never a fake `0 W`, and every
   navigation affordance stays reachable — that is what lets the UI be checked without a Victron in

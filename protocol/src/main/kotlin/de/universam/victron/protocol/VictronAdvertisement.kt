@@ -23,6 +23,9 @@ public class VictronHeader internal constructor(
     /** Human readable model name, or a `0x….` placeholder for model ids we don't know. */
     public val modelName: String get() = VictronModels.nameFor(modelId)
 
+    /** Maximum charge current in A derived from the model name; `null` if this is not an MPPT. */
+    public val maxChargeCurrentA: Int? get() = VictronModels.maxChargeCurrentA(modelId)
+
     override fun toString(): String =
         "VictronHeader(model=0x${modelId.toString(16).uppercase()} \"$modelName\", " +
             "record=${recordType.label}(0x${recordTypeCode.toString(16).uppercase()}), " +

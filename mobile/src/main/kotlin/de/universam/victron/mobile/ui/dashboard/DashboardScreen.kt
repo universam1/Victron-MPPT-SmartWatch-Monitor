@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import de.universam.victron.data.VictronPalette
-import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
@@ -41,7 +40,6 @@ private val TRACK = Color(0xFF1A2332)
 @Composable
 fun DashboardScreen(
     snapshots: List<DeviceSnapshot>,
-    config: AppConfig,
     now: Long,
     history: Map<String, ReadingHistory>,
     onOpenSetup: () -> Unit,
@@ -75,7 +73,6 @@ fun DashboardScreen(
                     val snapshot = decoded.getOrNull(page)
                     DeviceDashboard(
                         snapshot = snapshot,
-                        peakWatts = snapshot?.let { config.pvPeakWattsFor(it.address) } ?: 0,
                         now = now,
                         modifier = Modifier.fillMaxSize(),
                         history = snapshot?.let { history[it.address.uppercase()] },

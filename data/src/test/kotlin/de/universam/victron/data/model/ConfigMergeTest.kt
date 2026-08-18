@@ -90,6 +90,5 @@ class ConfigMergeTest {
 
         assertEquals("f".repeat(32), config.keyFor("AA:BB"))
         assertEquals("Van", config.labelFor("Aa:Bb"))
-        assertEquals(0, config.pvPeakWattsFor("AA:BB"))
     }
 }
