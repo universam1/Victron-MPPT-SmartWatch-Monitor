@@ -58,7 +58,7 @@ private val SURFACE_LIGHT = Color(0xFF1A2940)
 private const val FALLBACK_SCALE_W = 50
 
 /** Share of the width the gauge gets in the two-column (landscape) arrangement. */
-private const val GAUGE_COLUMN_WEIGHT = 0.40f
+private const val GAUGE_COLUMN_WEIGHT = 0.50f
 
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
