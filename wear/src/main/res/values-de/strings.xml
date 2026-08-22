@@ -47,6 +47,9 @@
     <string name="background_scan_off">Hintergrund-Scan: aus</string>
     <string name="background_scan_hint">Aktualisiert die Tile etwa alle 15 Minuten.</string>
 
+    <string name="auto_update_on">Auto-Update: ein</string>
+    <string name="auto_update_off">Auto-Update: aus</string>
+
     <string name="action_sync">Mit Handy synchronisieren</string>
     <string name="sync_hint">In der Handy-App eingegebene Schlüssel landen automatisch hier.</string>
 </resources>

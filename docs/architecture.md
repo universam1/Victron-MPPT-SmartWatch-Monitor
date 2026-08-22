@@ -5,7 +5,8 @@
 ```
 protocol/   pure Kotlin/JVM — header parsing, AES-CTR, bit unpacking, model ids
    ▲        no Android dependency, unit tested against a real advertisement
-data/       Android library — BLE scanning, decoding, persistence, ViewModel, WorkManager
+data/       Android library — BLE scanning, decoding, persistence, ViewModel, WorkManager,
+            self update from the project's GitHub releases
    ▲
    ├── wear/    Wear OS app: Compose for Wear OS (Material 3) + tile
    └── mobile/  phone app: Compose Material 3
@@ -149,18 +150,32 @@ and centred — a 32 character key field stretched across a landscape phone is u
 choice and typed input use `rememberSaveable`, so a rotation does not throw you back to setup or
 wipe a half-entered key.
 
+## Self update
+
+The app ships outside any store, so `data/update/` keeps it current from this repository's
+releases: `UpdateWorker` (every 6 h) → `ReleaseCatalog` picks the newest release carrying an APK
+for this device → `UpdateManager` downloads and checksums it into `cacheDir/updates` →
+`ApkInstaller` commits a `PackageInstaller` session, unattended on API 31+ because a self update
+with a matching signature is allowed to skip the dialog. `ReleaseCatalog` is Android-free and
+unit tested; it duplicates the release workflow's `versionCode` arithmetic, which is the one thing
+that must not drift. See [updates.md](updates.md).
+
 ## Permissions
 
-Only one runtime permission: `BLUETOOTH_SCAN`, declared with
+One runtime permission: `BLUETOOTH_SCAN`, declared with
 `android:usesPermissionFlags="neverForLocation"`. Because the app never connects to a device,
 `BLUETOOTH_CONNECT` is not needed, and because scanning is not used for positioning, no location
 permission is required either. `WorkManager`'s expedited jobs handle the "scan from the background"
 case, so there is no foreground service and no notification.
 
+The self updater adds two install-time permissions and no runtime prompt: `INTERNET` and
+`REQUEST_INSTALL_PACKAGES`. `POST_NOTIFICATIONS` is deliberately absent — the updater reports
+progress in the settings screen instead of notifying.
+
 ## Configuration
 
 `AppConfig` (JSON via DataStore) holds the device list with their advertisement keys, the
-background-scan toggle and the scan window. Keys can be entered
+background-scan toggle, the scan window and the auto-update toggle. Keys can be entered
 
 * on the phone: a normal text field (paste from a password manager),
 * on the watch: a hex keypad — 32 characters, one time, without depending on an IME.

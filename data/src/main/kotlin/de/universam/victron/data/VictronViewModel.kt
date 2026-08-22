@@ -9,6 +9,8 @@ import de.universam.victron.data.model.DeviceConfig
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
+import de.universam.victron.data.update.UpdateScheduler
+import de.universam.victron.data.update.UpdateState
 import de.universam.victron.protocol.VictronCipher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -44,6 +47,7 @@ public sealed interface SyncResult {
 public open class VictronViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = VictronData.repository(application)
+    private val updates = VictronData.updates(application)
 
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
     public val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
@@ -85,6 +89,12 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         .throttleLatest(UI_UPDATE_WINDOW_MILLIS)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
+    /** Where the self updater stands: checking, downloading, ready to install, failed. */
+    public val updateState: StateFlow<UpdateState> = updates.state
+
+    /** The version this build reports, for the "you are running X" line in both apps. */
+    public val installedVersionName: String get() = updates.installedVersionName
+
     private var scanJob: Job? = null
 
     init {
@@ -92,6 +102,15 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
             repository.loadCachedSnapshots()
             // Pick up whatever the counterpart device published while this app was closed.
             repository.syncNow()
+        }
+        viewModelScope.launch {
+            // The periodic check is WorkManager state, not config state: a fresh install has to
+            // enqueue it once, and a config restored from a backup has to re-enqueue it.
+            val enabled = repository.config.first().autoUpdateEnabled
+            UpdateScheduler.setPeriodicCheckEnabled(getApplication<Application>(), enabled)
+            // An APK a background run already staged installs on the first foreground moment,
+            // which is also the only moment a confirmation dialog can be shown below API 31.
+            if (enabled) updates.installStaged()
         }
     }
 
@@ -185,6 +204,22 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         viewModelScope.launch {
             repository.setBackgroundScanEnabled(enabled)
             ScanScheduler.setPeriodicScanEnabled(getApplication<Application>(), enabled)
+        }
+    }
+
+    /**
+     * Checks GitHub for a newer release and, when there is one, downloads, verifies and installs
+     * it. Runs in the ViewModel scope rather than through [UpdateScheduler] so the UI can follow
+     * every step in [updateState].
+     */
+    public fun updateNow() {
+        viewModelScope.launch { updates.updateNow() }
+    }
+
+    public fun setAutoUpdateEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setAutoUpdateEnabled(enabled)
+            UpdateScheduler.setPeriodicCheckEnabled(getApplication<Application>(), enabled)
         }
     }
 

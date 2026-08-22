@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_title">App-Updates</string>
+    <string name="update_hint">Diese App ist in keinem Store – sie aktualisiert sich selbst aus den GitHub-Releases des Projekts.</string>
+    <string name="update_auto">Updates automatisch installieren</string>
+
+    <string name="update_check">Nach Update suchen</string>
+    <string name="update_checking">Suche…</string>
+    <string name="update_available">Version %1$s verfügbar</string>
+    <string name="update_downloading">Lade %1$s…</string>
+    <string name="update_downloading_percent">Lade %1$s… %2$d %%</string>
+    <string name="update_ready">%1$s installieren</string>
+    <string name="update_installing">Installiere %1$s…</string>
+    <string name="update_current">Aktuell (%1$s)</string>
+    <string name="update_failed">Update fehlgeschlagen: %1$s</string>
+</resources>

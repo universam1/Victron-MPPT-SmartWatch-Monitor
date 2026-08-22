@@ -17,6 +17,9 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import de.universam.victron.data.VictronViewModel
 import de.universam.victron.data.model.SnapshotStatus
+import de.universam.victron.data.update.UpdateState
+import de.universam.victron.data.update.isBusy
+import de.universam.victron.data.update.updateStatusText
 import de.universam.victron.wear.R
 
 /**
@@ -110,12 +113,54 @@ fun DevicesScreen(
             }
         }
 
+        // Self update: the watch app is sideloaded, so nothing else will ever refresh it.
         item {
             val context = LocalContext.current
-            val version = context.packageManager
-                .getPackageInfo(context.packageName, 0).versionName ?: ""
+            val updateState = collect(viewModel.updateState)
+            Button(
+                onClick = { viewModel.updateNow() },
+                enabled = !updateState.isBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = updateStatusText(context, updateState),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (updateState is UpdateState.Failed) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 3,
+                )
+            }
+        }
+
+        item {
+            Button(
+                onClick = { viewModel.setAutoUpdateEnabled(!config.autoUpdateEnabled) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (config.autoUpdateEnabled) R.string.auto_update_on else R.string.auto_update_off,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                )
+            }
+        }
+
+        item {
             Text(
-                text = "v$version",
+                text = stringResource(R.string.update_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item {
+            Text(
+                text = "v${viewModel.installedVersionName}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
