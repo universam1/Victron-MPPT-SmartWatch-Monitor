@@ -23,6 +23,8 @@ import com.android.tools.screenshot.PreviewTest
 import de.universam.victron.data.Formatting
 import de.universam.victron.data.VictronPalette
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.MetricSeries
+import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
 import de.universam.victron.data.model.SolarChargerValues
 
@@ -55,6 +57,27 @@ private val sampleSnapshot = DeviceSnapshot(
     observedPvPeakW = 320,
 )
 
+private val staleSnapshot = sampleSnapshot.copy(
+    receivedAtEpochMillis = System.currentTimeMillis() - 120_000,
+)
+
+/**
+ * A morning that peaked and fell back. `sampleSnapshot` is a 100/20 on a 13.42 V battery, so the
+ * power scale is 268 W and the current scale 20 A: the live 142 W / 4.2 A fill about half and a
+ * fifth of their arcs, while these peaks (~230 W, ~11 A) put both ticks well ahead of the tips.
+ * Fixed step so the golden images stay stable.
+ */
+private val sampleHistory = ReadingHistory(
+    pvPowerW = MetricSeries.of(
+        (0 until 30).map { (kotlin.math.sin(it * 0.11) * 130.0 + 100.0).toFloat() },
+        stepMillis = 150_000L,
+    ),
+    batteryCurrent = MetricSeries.of(
+        (0 until 30).map { (kotlin.math.sin(it * 0.11) * 6.0 + 5.0).toFloat() },
+        stepMillis = 150_000L,
+    ),
+)
+
 @PreviewTest
 @Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
@@ -69,11 +92,15 @@ fun PreviewPowerArc() {
             color = solar,
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
+            // The same four stops GaugeFace really renders — a three-stop list here used to make
+            // this golden disagree with every screen that shows the gauge.
             gradientColors = listOf(
                 Color(VictronPalette.HEAT_LOW),
+                Color(VictronPalette.HEAT_MID_LOW),
                 Color(VictronPalette.HEAT_MID),
                 Color(VictronPalette.HEAT_HIGH),
             ),
+            peakFraction = 0.72f,
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.Bottom) {
@@ -106,6 +133,21 @@ fun PreviewWatchFace() {
         GaugeFace(
             snapshot = sampleSnapshot,
             now = System.currentTimeMillis(),
+            history = sampleHistory,
+        )
+    }
+}
+
+/** Stale: both arcs flat and dim, with their peak ticks dimmed rather than dropped. */
+@PreviewTest
+@Preview(widthDp = 240, heightDp = 240, backgroundColor = 0xFF000000, showBackground = true)
+@Composable
+fun PreviewWatchFaceStale() {
+    Box(modifier = Modifier.size(240.dp)) {
+        GaugeFace(
+            snapshot = staleSnapshot,
+            now = System.currentTimeMillis(),
+            history = sampleHistory,
         )
     }
 }
@@ -119,6 +161,7 @@ fun PreviewHero() {
         HeroContent(
             snapshot = sampleSnapshot,
             now = System.currentTimeMillis(),
+            history = sampleHistory,
             deviceCount = 1,
         )
     }

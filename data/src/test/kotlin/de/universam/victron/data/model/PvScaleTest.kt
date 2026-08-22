@@ -132,4 +132,16 @@ class PvScaleTest {
         assertEquals("1.42 kWh", Formatting.energy(1420))
         assertEquals(Formatting.PLACEHOLDER, Formatting.volts(null))
     }
+
+    @Test
+    fun `a trend span is a plain duration, with no "now" to confuse it with an age`() {
+        assertEquals("0s", Formatting.duration(0))
+        assertEquals("59s", Formatting.duration(59_000))
+        assertEquals("14m", Formatting.duration(14 * 60_000L))
+        assertEquals("2h", Formatting.duration(2 * 3_600_000L))
+        assertEquals("3d", Formatting.duration(3 * 86_400_000L))
+        // age delegates to duration above five seconds, so the two ladders cannot drift apart.
+        assertEquals("now", Formatting.age(0))
+        assertEquals(Formatting.duration(42_000), Formatting.age(42_000))
+    }
 }

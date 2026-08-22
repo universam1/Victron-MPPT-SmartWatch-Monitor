@@ -55,7 +55,10 @@ import de.universam.victron.data.ScanUnavailable
 import de.universam.victron.data.VictronPalette
 import de.universam.victron.data.VictronViewModel
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
+import de.universam.victron.data.model.batteryCurrentPeakFraction
+import de.universam.victron.data.model.pvPeakFraction
 import de.universam.victron.wear.R
 
 /**
@@ -74,6 +77,7 @@ fun HeroScreen(
 
     val snapshots = collect(viewModel.snapshots)
     val scanState = collect(viewModel.scanState)
+    val history = collect(viewModel.history)
     val now = rememberNow()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -112,6 +116,8 @@ fun HeroScreen(
     HeroContent(
         snapshot = selected,
         now = now,
+        // Keyed by uppercase address in the repository, same as the phone dashboard does it.
+        history = selected?.let { history[it.address.uppercase()] },
         deviceCount = decoded.size,
         status = status,
         onStatusClick = { onOpenDevices() },
@@ -130,6 +136,7 @@ fun HeroScreen(
 internal fun HeroContent(
     snapshot: DeviceSnapshot?,
     now: Long,
+    history: ReadingHistory? = null,
     deviceCount: Int = 0,
     status: String? = null,
     onStatusClick: () -> Unit = {},
@@ -159,6 +166,7 @@ internal fun HeroContent(
                 GaugeFace(
                     snapshot = snapshot,
                     now = now,
+                    history = history,
                     deviceCount = deviceCount,
                     onCycleDevice = onCycleDevice,
                     // A lazy list measures items with an unbounded height, so a plain
@@ -287,6 +295,7 @@ internal fun HeroContent(
 internal fun GaugeFace(
     snapshot: DeviceSnapshot?,
     now: Long,
+    history: ReadingHistory? = null,
     deviceCount: Int = 1,
     onCycleDevice: () -> Unit = {},
     modifier: Modifier = Modifier.fillMaxSize(),
@@ -298,6 +307,13 @@ internal fun GaugeFace(
         Color(VictronPalette.TEXT_DIM)
     } else {
         Color(VictronPalette.currentColor(values?.batteryCurrent))
+    }
+    // The peak is a fact about the recorded window, not about freshness, so it is dimmed when the
+    // values are stale rather than hidden.
+    val peakColor = if (stale) {
+        Color(VictronPalette.TEXT_DIM).copy(alpha = 0.7f)
+    } else {
+        Color(VictronPalette.PEAK_MARKER)
     }
     Box(
         modifier = modifier.background(Color(VictronPalette.BACKGROUND)),
@@ -314,6 +330,8 @@ internal fun GaugeFace(
                 Color(VictronPalette.HEAT_MID),
                 Color(VictronPalette.HEAT_HIGH),
             ),
+            peakFraction = snapshot?.pvPeakFraction(history),
+            peakColor = peakColor,
         )
         PowerArc(
             fraction = snapshot?.batteryCurrentFraction() ?: 0f,
@@ -328,6 +346,8 @@ internal fun GaugeFace(
                 Color(VictronPalette.CURRENT_MID),
                 Color(VictronPalette.CURRENT_HIGH),
             ),
+            peakFraction = snapshot?.batteryCurrentPeakFraction(history),
+            peakColor = peakColor,
         )
 
         Column(

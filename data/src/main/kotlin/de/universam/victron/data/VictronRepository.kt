@@ -40,13 +40,13 @@ public class VictronRepository internal constructor(
 
     private val _snapshots = MutableStateFlow<Map<String, DeviceSnapshot>>(emptyMap())
 
-    /** Ring buffer of recent readings per device, for sparkline graphs. */
+    /** Trend buffer per device, spanning the runtime within the current day. */
     private val _history = MutableStateFlow<Map<String, ReadingHistory>>(emptyMap())
 
     /** Newest snapshot per BLE address, keyed by uppercase address. */
     public val snapshots: StateFlow<Map<String, DeviceSnapshot>> = _snapshots.asStateFlow()
 
-    /** Recent value history per device address (in-memory only, not persisted). */
+    /** Value history per device address (in-memory only, not persisted). */
     public val history: StateFlow<Map<String, ReadingHistory>> = _history.asStateFlow()
 
     public val config: Flow<AppConfig> = configStore.data
@@ -144,7 +144,7 @@ public class VictronRepository internal constructor(
         val values = snapshot.solarCharger ?: return
         val current = _history.value
         val h = current[address] ?: ReadingHistory()
-        _history.value = current + (address to h.append(values))
+        _history.value = current + (address to h.append(values, snapshot.receivedAtEpochMillis))
     }
 
     private fun decode(

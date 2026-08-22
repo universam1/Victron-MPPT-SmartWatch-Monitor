@@ -79,6 +79,33 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   the device's data counter, so this drops only genuine repeats and never delays a new reading. The
   filter is per scan session: a restart must re-process what is on the air. A time-based rate limit
   here would be wrong, because it cannot tell a repeat from a new reading.
+- **The trend buffer spans the runtime, bounded by decimation, and each bucket keeps its extreme.**
+  `MetricSeries` is not a sliding window: it starts at the first reading and grows, and when it
+  fills up adjacent buckets merge and `readingsPerBucket` doubles. A merged bucket keeps the sample
+  furthest from zero **with its sign** — never the average. That is what makes `peak` exact rather
+  than approximate, and it is the only reason the arc marker can be trusted; it also keeps a
+  discharge spike, which a plain `max` would erase from the one signed metric. `points` appends the
+  bucket still filling so the curve advances on every reading, and the sparkline x axis stays
+  **reading-index based** on purpose: scans are bounded to a visible screen, so wall-clock data is
+  bursty and a time axis would draw a day as mostly empty gaps. The span label supplies the missing
+  wall-clock context.
+- **The day purge lives in `ReadingHistory`, not in `MetricSeries`.** One day check per reading
+  clears *every* series. Checking per metric would leave yesterday's points in any curve whose field
+  is absent from the first reading after midnight — a charger with no load output, or a "not
+  available" sentinel — and blend them into today's. `yieldTodayWh` additionally restarts when the
+  counter *drops*, because the charger resets it on its own clock: without that, one `0` after
+  3.2 kWh pins the rest of the day's sparkline to the top of its box.
+- **`observedPvPeakW`/`observedCurrentPeakA` are a fallback *scale*, the marker is today's peak.**
+  The observed peaks are all-time and persisted, and must stay that way — they are what scales an
+  unknown model's gauge. Using them for the tick would pin it at last week's noon. Keep the
+  asymmetry.
+- **`CurrentArcGauge` reserves a band, not a square, and gives up width before height.** A 104° arc's
+  visible band is `0.384·r` tall and `1.576·r` wide — a fixed ~1:4.1 shape, so width and height
+  cannot both be satisfied. The band is `r·0.384 + glow` with the circle's centre placed *above* the
+  widget (`cy = glow/2 − 0.616·r`), the mirror image of `PvArcGauge`; the radius is the smaller of
+  what the width allows and what `maxArcHeight` allows, and a height-bound arc gets narrower and
+  centres itself rather than turning into an ellipse. Widening the sweep makes it *taller*, not
+  shorter — do not "fix" a cramped landscape by opening the arc up.
 - **The UI observes snapshots and history through `throttleLatest` (2 Hz), the repository does not.**
   Every emission redraws the gradient arc gauges and sparklines, so the cap is about redraw cost;
   the repository still records every reading, which is what keeps the history buffer complete. Use
@@ -118,8 +145,9 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   `maxWidth > maxHeight`): one scrolling column when tall, two columns with a height-sized gauge
   (`PvArcGauge(matchHeightFirst = true)`) when wide, where the header also puts the model name
   beside the device name rather than under it (`DashboardHeader(singleLine = true)`). Both
-  arrangements call the *same* `DashboardHeader`/`ValueTiles`/`PvArcGauge` — don't fork them into two
-  layouts that drift. Deriving the square gauge from the width in landscape is the bug this replaced.
+  arrangements call the *same* `DashboardHeader`/`ValueTiles`/`PvArcGauge`/`CurrentArcGauge` — only
+  `maxArcHeight`/`strokeWidth`/`sparklineHeight` differ between them, never the composable. Don't
+  fork them into two layouts that drift. Deriving the square gauge from the width in landscape is the bug this replaced.
 - **`PvArcGauge` reserves 0.8 of its diameter in height, not a full square** (`ARC_HEIGHT_FRACTION`):
   the 240° arc's tips sit half a radius below the centre, so a square box always ended in an empty
   band, and that band pushed the bottom tiles off a portrait screen. The circle hangs from the top of
@@ -151,17 +179,42 @@ Keep this section updated when the UI changes. Screenshots are verified against 
 
 ### Arc gauges — heat gradient
 
-Both arc gauges paint a **sweep gradient along their length** (not a flat color):
+The arc gauges paint a **sweep gradient along their length** (not a flat color):
 
 | Arc | Geometry | Gradient (start → tip) |
 |---|---|---|
-| PV power (wear + mobile) | 240°, starts 150° | `HEAT_LOW` yellow → `HEAT_MID` orange → `HEAT_HIGH` fire-red |
+| PV power (wear + mobile) | 240°, starts 150° | `HEAT_LOW` white → `HEAT_MID_LOW` SOLAR yellow → `HEAT_MID` dark orange → `HEAT_HIGH` fire-red |
 | Battery current (wear) | 104°, starts 38° | `CURRENT_LOW` green → `CURRENT_MID` yellow-green → `CURRENT_HIGH` orange |
+| Battery current (mobile) | 104°, starts 38° — same arc, radius from the row width, height-capped | same `CURRENT_*` stops when charging; flat `DISCHARGING` orange when the current is negative |
+
+Four stops on the PV arc, not three: `HEAT_LOW` is white, and the SOLAR yellow is `HEAT_MID_LOW`.
 
 Implementation: `Brush.sweepGradient` inside a `rotate(startAngle)` transform, then `drawArc` from
-0° so the gradient aligns with the arc start. The glow layer uses the tip color at reduced alpha.
+0° so the gradient aligns with the arc start. The glow layer uses a **low** stop at reduced alpha,
+never the tip colour — wear the first stop at α 0.25, mobile `HEAT_MID_LOW` (the *second* stop) at
+α 0.35, because mobile's first stop is white and a white glow washes the arc out.
 
-When **stale**, both arcs fall back to flat `TEXT_DIM` (no gradient).
+The mobile arcs are drawn through one helper, `mobile/.../dashboard/GaugeArc.kt`
+(`ArcSpec` + `drawArcTrack`/`drawArcFill`/`drawPeakTick`), so the power gauge, the current gauge and
+the peak tick cannot drift apart. Wear keeps its own `PowerArc` — the modules do not depend on each
+other, and the numbers that must agree live in `data`.
+
+When **stale**, all four arcs fall back to flat `TEXT_DIM` (no gradient).
+
+### Peak marker
+
+Every arc marks the **highest value in the trendline window** with a thin line drawn radially
+*across* the track:
+
+- position from `DeviceSnapshot.pvPeakFraction` / `batteryCurrentPeakFraction`, which divide by the
+  *same* full scale as `pvFraction`/`batteryCurrentFraction`, so tick and fill cannot disagree;
+- colour `VictronPalette.PEAK_MARKER` (90 % white), `TEXT_DIM` at α 0.7 when stale — the peak is a
+  fact about the recorded window, not about freshness, so it is dimmed rather than hidden;
+- thickness = 0.15 × the arc stroke, floor 1.5 dp; it overhangs the stroke by `(glow − stroke) / 2`
+  on each side, which is exactly the inset the canvas already has, so it can never be clipped;
+- animated with the fill's own tween, so a new high and the value that set it move together;
+- omitted when there is no peak, when the peak is 0, and when it would land inside the dot the arc
+  always draws at its start.
 
 ### Wear hero detail buttons
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.VictronPalette
+import de.universam.victron.data.model.MetricSeries
 
 private val SURFACE = Color(0xFF121E2E)
 private val SURFACE_LIGHT = Color(0xFF1A2940)
@@ -48,7 +49,7 @@ fun ValueTile(
     stale: Boolean,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    sparklineValues: List<Float> = emptyList(),
+    series: MetricSeries? = null,
     compact: Boolean = false,
 ) {
     val activeAccent = if (stale) TEXT_DIM else accentColor
@@ -63,10 +64,12 @@ fun ValueTile(
             .background(bgBrush)
             .background(washColor),
     ) {
-        // Sparkline behind content
-        if (sparklineValues.size >= 2) {
+        // Sparkline behind content. No span label here: the tile is 28-40.dp tall behind its own
+        // value text, and the two prominent trends above already say how far back they reach.
+        val points = series?.points.orEmpty()
+        if (points.size >= 2) {
             Sparkline(
-                values = sparklineValues,
+                values = points,
                 color = activeAccent,
                 modifier = Modifier
                     .fillMaxWidth()

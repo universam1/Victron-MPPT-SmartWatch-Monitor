@@ -28,17 +28,26 @@ public object Formatting {
         else -> "$wattHours Wh"
     }
 
-    /** Compact "how old is this value" string: `now`, `42s`, `7m`, `3h`, `2d`. */
-    public fun age(ageMillis: Long): String {
-        val seconds = ageMillis / 1000
+    /**
+     * Compact duration: `0s`, `42s`, `7m`, `3h`, `2d`. Used for how far back a trend reaches, where
+     * [age]'s "now" would be meaningless.
+     */
+    public fun duration(millis: Long): String {
+        val seconds = (millis / 1000).coerceAtLeast(0)
         return when {
-            seconds < 5 -> "now"
             seconds < 60 -> "${seconds}s"
             seconds < 3600 -> "${seconds / 60}m"
             seconds < 86_400 -> "${seconds / 3600}h"
             else -> "${seconds / 86_400}d"
         }
     }
+
+    /**
+     * Compact "how old is this value" string: `now`, `42s`, `7m`, `3h`, `2d`. Delegates to
+     * [duration] so the two unit ladders cannot drift apart.
+     */
+    public fun age(ageMillis: Long): String =
+        if (ageMillis / 1000 < 5) "now" else duration(ageMillis)
 
     public fun age(snapshot: DeviceSnapshot, nowEpochMillis: Long = System.currentTimeMillis()): String =
         age(snapshot.ageMillis(nowEpochMillis))

@@ -75,10 +75,11 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppConfig())
 
     /**
-     * Recent value history per device address, for sparkline graphs.
+     * Value history per device address, for the trend graphs and the arcs' peak marks.
      *
      * Throttled like [snapshots] — a sparkline redraw per reading is the same wasted work. The
-     * buffer behind it still gets every reading, so no sample is missing from the curve.
+     * buffer behind it still gets every reading, and it decimates by keeping each bucket's extreme,
+     * so no peak is missing from the curve.
      */
     public val history: StateFlow<Map<String, ReadingHistory>> = repository.history
         .throttleLatest(UI_UPDATE_WINDOW_MILLIS)

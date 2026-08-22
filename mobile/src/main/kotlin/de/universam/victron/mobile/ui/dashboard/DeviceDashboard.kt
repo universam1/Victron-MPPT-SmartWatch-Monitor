@@ -43,6 +43,8 @@ import de.universam.victron.data.VictronPalette
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SolarChargerValues
+import de.universam.victron.data.model.batteryCurrentPeakFraction
+import de.universam.victron.data.model.pvPeakFraction
 import de.universam.victron.mobile.R
 
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
@@ -63,7 +65,7 @@ private const val GAUGE_COLUMN_WEIGHT = 0.50f
 
 /**
  * Fullscreen dashboard layout for a single decoded device. Shows the PV arc gauge prominently,
- * a charger state chip, battery current bar with sparkline, then value tiles with sparklines.
+ * a charger state chip, the battery current arc with its trend, then value tiles with trends.
  *
  * The arrangement follows the shape of the window rather than the orientation sensor: taller than
  * wide gets one scrolling column, wider than tall gets two columns with the gauge — sized to the
@@ -126,7 +128,8 @@ fun DeviceDashboard(
                             watts = values?.pvPowerW,
                             scaleMaxW = scaleMax,
                             stale = stale,
-                            sparklineValues = history?.pvPowerW.orEmpty(),
+                            series = history?.pvPowerW,
+                            peakFraction = snapshot?.pvPeakFraction(history),
                             matchHeightFirst = true,
                         )
                     }
@@ -138,14 +141,17 @@ fun DeviceDashboard(
                             .then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                         verticalArrangement = if (compact) Arrangement.spacedBy(10.dp) else Arrangement.SpaceEvenly,
                     ) {
-                        CurrentBar(
+                        CurrentArcGauge(
                             amps = values?.batteryCurrent,
                             maxAmps = snapshot?.batteryCurrentMaxA(),
                             stale = stale,
-                            sparklineValues = history?.batteryCurrent.orEmpty(),
+                            series = history?.batteryCurrent,
+                            peakFraction = snapshot?.batteryCurrentPeakFraction(history),
                             // Vertical space is scarce on a phone landscape;
-                            // head units (>=500dp tall) get a moderate sparkline.
+                            // head units (>=500dp tall) get a moderate trend and a bigger arc.
                             sparklineHeight = if (compact) 36.dp else 48.dp,
+                            maxArcHeight = if (compact) 48.dp else 88.dp,
+                            strokeWidth = if (compact) 10.dp else 16.dp,
                         )
                         ValueTiles(
                             values = values,
@@ -169,15 +175,17 @@ fun DeviceDashboard(
                         watts = values?.pvPowerW,
                         scaleMaxW = scaleMax,
                         stale = stale,
-                        sparklineValues = history?.pvPowerW.orEmpty(),
+                        series = history?.pvPowerW,
+                        peakFraction = snapshot?.pvPeakFraction(history),
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    CurrentBar(
+                    CurrentArcGauge(
                         amps = values?.batteryCurrent,
                         maxAmps = snapshot?.batteryCurrentMaxA(),
                         stale = stale,
-                        sparklineValues = history?.batteryCurrent.orEmpty(),
+                        series = history?.batteryCurrent,
+                        peakFraction = snapshot?.batteryCurrentPeakFraction(history),
                     )
 
                     ValueTiles(values = values, history = history, stale = stale)
@@ -297,7 +305,7 @@ private fun ValueTiles(
             stale = stale,
             icon = Icons.Filled.BatteryChargingFull,
             modifier = Modifier.weight(1f),
-            sparklineValues = history?.batteryVoltage.orEmpty(),
+            series = history?.batteryVoltage,
             compact = compact,
         )
         ValueTile(
@@ -307,7 +315,7 @@ private fun ValueTiles(
             stale = stale,
             icon = Icons.Filled.WbSunny,
             modifier = Modifier.weight(1f),
-            sparklineValues = history?.yieldTodayWh.orEmpty(),
+            series = history?.yieldTodayWh,
             compact = compact,
         )
     }
@@ -362,7 +370,7 @@ private fun ValueTiles(
                 stale = stale,
                 icon = Icons.Filled.Power,
                 modifier = Modifier.weight(1f),
-                sparklineValues = history?.loadCurrent.orEmpty(),
+                series = history?.loadCurrent,
                 compact = compact,
             )
         } else {

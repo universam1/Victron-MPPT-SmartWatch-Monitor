@@ -17,8 +17,9 @@ dashboard.
 * No connection to the charger: VictronConnect keeps working while you watch.
 * No phone required — the watch app is standalone and scans with the watch's own radio.
 * No IDE required — everything builds in Docker with one script.
-* **Phone dashboard** — auto-navigates to a fullscreen view with glowing arc gauge, animated
-  battery bar, sparkline trend graphs on every metric, and swipe between devices.
+* **Phone dashboard** — auto-navigates to a fullscreen view with two glowing arc gauges (power and
+  battery current, the same pair the watch draws), trend graphs on every metric that grow to cover
+  the whole day, and swipe between devices.
 * **Watch face** — full-bezel power gauge with large watts and amps, scrolls down into a detail list with all values.
 
 The tile draws the same gauge, so tile and app never look like two different apps.
@@ -82,6 +83,7 @@ The watch also works entirely on its own: it lists every Victron device in range
 | Load output | on models that have one |
 | Age | how old the reading is — always visible |
 | Gauge scale | from the model name — a *MPPT 100/20* is a 20 A charger, so its scales are 20 A and 20 A × battery volts |
+| Peak marker | a tick on each arc at the highest value of the day, from the same trend buffer the graphs draw |
 
 Other Victron devices (SmartShunt, Lynx Smart BMS, BatteryProtect, …) are **discovered and
 decrypted**, but their record types are not decoded into values yet; the *Raw data* screen shows

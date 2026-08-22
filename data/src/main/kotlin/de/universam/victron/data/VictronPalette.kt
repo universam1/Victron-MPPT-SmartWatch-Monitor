@@ -28,6 +28,13 @@ public object VictronPalette {
     public const val CURRENT_MID: Int = 0xFFCCDB39.toInt()   // yellow-green
     public const val CURRENT_HIGH: Int = 0xFFFF8A5C.toInt()  // orange
 
+    /**
+     * High-water mark drawn across an arc's track. Neutral on purpose: painting it in the gradient
+     * colour at the peak position would make it vanish into the fill whenever the current value
+     * *is* the peak.
+     */
+    public const val PEAK_MARKER: Int = 0xE6FFFFFF.toInt()
+
     public const val TRACK: Int = 0xFF2A2D33.toInt()
     public const val TEXT: Int = 0xFFFFFFFF.toInt()
     public const val TEXT_DIM: Int = 0xFF9AA0A6.toInt()

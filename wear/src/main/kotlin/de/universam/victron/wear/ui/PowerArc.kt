@@ -11,14 +11,21 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import de.universam.victron.data.VictronPalette
+import kotlin.math.cos
+import kotlin.math.sin
 
 /** Default geometry: a 240° arc with the gap at the bottom (start at 7 o'clock). */
 private const val DEFAULT_START_ANGLE = 150f
 private const val DEFAULT_SWEEP_ANGLE = 240f
+
+/** Thickness of the peak tick, as a share of the arc stroke it crosses. */
+private const val TICK_WIDTH_FRACTION = 0.15f
 
 /**
  * The gauge the whole watch screen is built around: one thick arc drawn along the bezel so the
@@ -30,6 +37,10 @@ private const val DEFAULT_SWEEP_ANGLE = 240f
  *
  * Pass [gradientColors] to paint a heat-gradient along the arc (e.g. yellow → orange → red).
  * When null, the arc uses the flat [color].
+ *
+ * [peakFraction] marks the highest value in the trend window with a tick across the track. It is
+ * already normalised, exactly like [fraction] — this stays a primitive that knows nothing about a
+ * snapshot; see `DeviceSnapshot.pvPeakFraction` for where the scaling happens.
  */
 @Composable
 fun PowerArc(
@@ -41,11 +52,20 @@ fun PowerArc(
     startAngle: Float = DEFAULT_START_ANGLE,
     sweepAngle: Float = DEFAULT_SWEEP_ANGLE,
     gradientColors: List<Color>? = null,
+    peakFraction: Float? = null,
+    peakColor: Color = Color(VictronPalette.PEAK_MARKER),
 ) {
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 600),
         label = "arc",
+    )
+    // Same spec as the fill: a new high arrives in the same frame as the value that set it, so
+    // animating both keeps them together instead of the tick jumping ahead of the tip.
+    val animatedPeak by animateFloatAsState(
+        targetValue = (peakFraction ?: 0f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 600),
+        label = "arc-peak",
     )
 
     Canvas(modifier = modifier) {
@@ -159,5 +179,55 @@ fun PowerArc(
                 style = stroke,
             )
         }
+
+        // Last, so it survives landing on the fill's own end cap.
+        if (peakFraction != null) {
+            drawPeakTick(
+                center = center,
+                radius = arcSize.width / 2f,
+                angleDegrees = startAngle + sweepAngle * animatedPeak,
+                strokeWidth = strokeWidth.toPx(),
+                overhang = 6.dp.toPx() / 2f,
+                minSweep = minSweep,
+                sweepFromStart = sweepAngle * animatedPeak,
+                color = peakColor,
+            )
+        }
     }
+}
+
+/**
+ * A thin line drawn radially *across* the arc's track, overhanging the stroke on both sides so it
+ * reads as a scale mark rather than a piece of the fill. [overhang] is half the glow's extra width,
+ * which is exactly the room the canvas is already inset by, so the tick can never be clipped.
+ *
+ * Skipped when it would fall inside the dot the arc always draws at its start, where it would only
+ * thicken that dot. Uses `center` because a wear arc gets a square canvas — the phone gauges hang
+ * off an edge and must pivot on their own computed centre instead.
+ */
+private fun DrawScope.drawPeakTick(
+    center: Offset,
+    radius: Float,
+    angleDegrees: Float,
+    strokeWidth: Float,
+    overhang: Float,
+    minSweep: Float,
+    sweepFromStart: Float,
+    color: Color,
+) {
+    if (sweepFromStart < minSweep) return
+
+    val radians = Math.toRadians(angleDegrees.toDouble())
+    val dx = cos(radians).toFloat()
+    val dy = sin(radians).toFloat()
+    val inner = radius - strokeWidth / 2f - overhang
+    val outer = radius + strokeWidth / 2f + overhang
+
+    drawLine(
+        color = color,
+        start = Offset(center.x + dx * inner, center.y + dy * inner),
+        end = Offset(center.x + dx * outer, center.y + dy * outer),
+        strokeWidth = (strokeWidth * TICK_WIDTH_FRACTION).coerceAtLeast(1.5.dp.toPx()),
+        cap = StrokeCap.Butt,
+    )
 }

@@ -48,4 +48,8 @@
     <string name="label_battery_current">Batteriestrom</string>
     <string name="label_voltage">Spannung</string>
     <string name="gauge_of_scale">von %1$d W</string>
+    <!-- Full scale of the current arc. The value already carries its unit. -->
+    <string name="gauge_of_scale_amps">von %1$s</string>
+    <!-- How far back the trend beside it reaches, e.g. "Trend 2h". -->
+    <string name="trend_span">Verlauf %1$s</string>
 </resources>

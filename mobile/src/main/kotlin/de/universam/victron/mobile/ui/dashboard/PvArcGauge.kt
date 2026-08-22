@@ -23,17 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
 import de.universam.victron.data.VictronPalette
+import de.universam.victron.data.model.MetricSeries
 import de.universam.victron.mobile.R
 
 private const val START_ANGLE = 150f
@@ -48,13 +45,28 @@ private const val SWEEP_ANGLE = 240f
  */
 private const val ARC_HEIGHT_FRACTION = 0.8f
 
+/** Smallest gauge that still has room for a trend inside the arc. */
+private val SPARKLINE_MIN_DIAMETER = 220.dp
+
 private val SOLAR = Color(VictronPalette.SOLAR)
 private val TRACK = Color(0xFF1A2332)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
 
+/** White → SOLAR yellow → dark orange → fire-red along the length of the arc. */
+private val HEAT_GRADIENT = listOf(
+    Color(VictronPalette.HEAT_LOW),
+    Color(VictronPalette.HEAT_MID_LOW),
+    Color(VictronPalette.HEAT_MID),
+    Color(VictronPalette.HEAT_HIGH),
+)
+
 /**
  * Large animated arc gauge showing PV power. A glow arc drawn behind the main arc gives depth;
- * the watts value sits centered inside with an optional sparkline trend below.
+ * the watts value sits centered inside with an optional trend below.
+ *
+ * [peakFraction] marks the highest power in the trend window with a tick across the track — see
+ * `DeviceSnapshot.pvPeakFraction`, which scales it by the same full scale as [fraction] so the tick
+ * and the fill cannot disagree. `null` means there is nothing to mark yet.
  *
  * The gauge is a circle that reserves only [ARC_HEIGHT_FRACTION] of its diameter in height, because
  * the arc leaves the bottom of its square empty. Pass [matchHeightFirst] when the height is the
@@ -72,7 +84,8 @@ fun PvArcGauge(
     watts: Int?,
     scaleMaxW: Int,
     stale: Boolean,
-    sparklineValues: List<Float> = emptyList(),
+    series: MetricSeries? = null,
+    peakFraction: Float? = null,
     matchHeightFirst: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -80,6 +93,13 @@ fun PvArcGauge(
         targetValue = fraction.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 800),
         label = "pv-arc",
+    )
+    // Animated with the same spec as the fill: a new high arrives in the same frame as the value
+    // that set it, and animating both keeps them together instead of the tick jumping ahead.
+    val animatedPeak by animateFloatAsState(
+        targetValue = (peakFraction ?: 0f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 800),
+        label = "pv-arc-peak",
     )
 
     BoxWithConstraints(
@@ -95,130 +115,46 @@ fun PvArcGauge(
         Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
             val strokeWidth = 20.dp.toPx()
             val glowWidth = strokeWidth + 8.dp.toPx()
-            val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            val glowStroke = Stroke(width = glowWidth, cap = StrokeCap.Round)
             val inset = glowWidth / 2f
             // Draw a circle in whatever box we got: an extreme window aspect ratio must not turn
             // the gauge into an ellipse. It hangs from the top edge, so the part left outside the
-            // box is the empty bottom of the arc.
+            // box is the empty bottom of the arc — which is why ArcSpec.center, and not
+            // DrawScope.center, is what everything angular pivots on.
             val diameterPx = minOf(size.width, size.height / ARC_HEIGHT_FRACTION)
-            val arcSize = Size(diameterPx - glowWidth, diameterPx - glowWidth)
-            val topLeft = Offset((size.width - diameterPx) / 2f + inset, inset)
-            // The circle's centre, which is below the box centre now that it hangs from the top.
-            // The sweep gradient and the rotation that aligns it to START_ANGLE both pivot here.
-            val arcCenter = Offset(topLeft.x + arcSize.width / 2f, topLeft.y + arcSize.height / 2f)
-
-            // Track — slightly blue-tinted for depth
-            drawArc(
-                color = TRACK,
+            val spec = ArcSpec(
+                topLeft = Offset((size.width - diameterPx) / 2f + inset, inset),
+                size = Size(diameterPx - glowWidth, diameterPx - glowWidth),
                 startAngle = START_ANGLE,
                 sweepAngle = SWEEP_ANGLE,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = stroke,
+                strokeWidth = strokeWidth,
+                glowWidth = glowWidth,
             )
 
-            if (animated > 0f) {
-                if (stale) {
-                    // Stale: flat dim color, no gradient
-                    drawArc(
-                        color = TEXT_DIM,
-                        startAngle = START_ANGLE,
-                        sweepAngle = SWEEP_ANGLE * animated,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = stroke,
-                    )
+            drawArcTrack(spec, TRACK)
+            drawArcFill(
+                spec = spec,
+                fraction = animated,
+                // Stale: flat dim colour, no heat gradient.
+                gradient = if (stale) null else HEAT_GRADIENT,
+                flatColor = if (stale) TEXT_DIM else SOLAR,
+                // The *second* stop, not the first: the first is white and a white glow washes the
+                // whole arc out.
+                glowColor = if (stale) {
+                    TEXT_DIM.copy(alpha = 0.25f)
                 } else {
-                    // Heat gradient: white → yellow → orange → red along the arc
-                    val arcFraction = SWEEP_ANGLE / 360f
-                    val heatLow = Color(VictronPalette.HEAT_LOW)
-                    val heatMidLow = Color(VictronPalette.HEAT_MID_LOW)
-                    val heatMid = Color(VictronPalette.HEAT_MID)
-                    val heatHigh = Color(VictronPalette.HEAT_HIGH)
-                    val stops = arrayOf(
-                        0f to heatLow,
-                        arcFraction * 0.33f to heatMidLow,
-                        arcFraction * 0.66f to heatMid,
-                        arcFraction to heatHigh,
-                        1f to heatHigh,
-                    )
-                    val brush = Brush.sweepGradient(colorStops = stops, center = arcCenter)
-                    val glowColor = heatMidLow.copy(alpha = 0.35f)
-
-                    // Butt caps for gradient + round-cap dots at endpoints for clean edges.
-                    // Glow keeps Round caps since it's a single color.
-                    val buttStroke = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                    val glowRoundStroke = Stroke(width = glowWidth, cap = StrokeCap.Round)
-                    val capRadius = arcSize.width / 2f
-                    val capAngle = strokeWidth / capRadius * (180f / Math.PI.toFloat()) * 0.1f
-
-                    rotate(degrees = START_ANGLE, pivot = arcCenter) {
-                        drawArc(
-                            color = glowColor,
-                            startAngle = 0f,
-                            sweepAngle = SWEEP_ANGLE * animated,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = glowRoundStroke,
-                        )
-                        drawArc(
-                            brush = brush,
-                            startAngle = 0f,
-                            sweepAngle = SWEEP_ANGLE * animated,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = buttStroke,
-                        )
-                        // Start cap
-                        drawArc(
-                            color = heatLow,
-                            startAngle = -capAngle,
-                            sweepAngle = capAngle * 2,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                        )
-                        // End cap — lerp color at the tip position
-                        val tipFrac = animated.coerceIn(0f, 1f)
-                        val tipColor = when {
-                            tipFrac < 0.33f -> androidx.compose.ui.graphics.lerp(heatLow, heatMidLow, tipFrac / 0.33f)
-                            tipFrac < 0.66f -> androidx.compose.ui.graphics.lerp(heatMidLow, heatMid, (tipFrac - 0.33f) / 0.33f)
-                            else -> androidx.compose.ui.graphics.lerp(heatMid, heatHigh, (tipFrac - 0.66f) / 0.34f)
-                        }
-                        drawArc(
-                            color = tipColor,
-                            startAngle = SWEEP_ANGLE * animated - capAngle,
-                            sweepAngle = capAngle * 2,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                        )
-                    }
-                }
-            } else {
-                // Minimal dot at the start so the arc is identifiable even at 0.
-                val fillColor = if (stale) TEXT_DIM else SOLAR
-                val minSweep = strokeWidth / (arcSize.width / 2f) * (180f / Math.PI.toFloat())
-                drawArc(
-                    color = fillColor,
-                    startAngle = START_ANGLE,
-                    sweepAngle = minSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = stroke,
+                    Color(VictronPalette.HEAT_MID_LOW).copy(alpha = 0.35f)
+                },
+            )
+            if (peakFraction != null) {
+                drawPeakTick(
+                    spec = spec,
+                    peakFraction = animatedPeak,
+                    color = if (stale) TEXT_DIM.copy(alpha = 0.7f) else Color(VictronPalette.PEAK_MARKER),
                 )
             }
         }
 
-        // Center content: text + sparkline. Offset to the circle's centre — the box is shorter than
+        // Center content: text + trend. Offset to the circle's centre — the box is shorter than
         // the circle, so its own centre sits above it.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -247,16 +183,18 @@ fun PvArcGauge(
                 color = if (stale) TEXT_DIM else SOLAR,
                 maxLines = 1,
             )
-            // Power sparkline inside the arc — dropped when the gauge is too small to fit it.
-            if (sparklineValues.size >= 2 && diameter >= 220.dp) {
+            // Power trend inside the arc — dropped when the gauge is too small to fit it.
+            val points = series?.points.orEmpty()
+            if (points.size >= 2 && diameter >= SPARKLINE_MIN_DIAMETER) {
                 Sparkline(
-                    values = sparklineValues,
+                    values = points,
                     color = if (stale) TEXT_DIM else SOLAR,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height((diameter * 0.1f).coerceAtMost(36.dp))
                         .padding(top = 6.dp),
                 )
+                TrendSpanLabel(series = series)
             }
         }
     }
