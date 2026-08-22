@@ -15,6 +15,7 @@ import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import de.universam.victron.data.R as DataR
 import de.universam.victron.data.VictronViewModel
 import de.universam.victron.data.model.SnapshotStatus
 import de.universam.victron.data.update.UpdateState
@@ -152,7 +153,7 @@ fun DevicesScreen(
 
         item {
             Text(
-                text = stringResource(R.string.update_hint),
+                text = stringResource(DataR.string.update_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

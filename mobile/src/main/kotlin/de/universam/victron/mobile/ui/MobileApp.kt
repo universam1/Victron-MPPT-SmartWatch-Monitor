@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.universam.victron.data.Formatting
+import de.universam.victron.data.R as DataR
 import de.universam.victron.data.ScanState
 import de.universam.victron.data.ScanUnavailable
 import de.universam.victron.data.SyncResult
@@ -428,11 +429,11 @@ private fun UpdateSection(viewModel: VictronViewModel, config: AppConfig) {
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = stringResource(R.string.update_title),
+            text = stringResource(DataR.string.update_title),
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = stringResource(R.string.update_hint),
+            text = stringResource(DataR.string.update_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -441,7 +442,7 @@ private fun UpdateSection(viewModel: VictronViewModel, config: AppConfig) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.update_auto))
+            Text(stringResource(DataR.string.update_auto))
             Switch(
                 checked = config.autoUpdateEnabled,
                 onCheckedChange = { viewModel.setAutoUpdateEnabled(it) },

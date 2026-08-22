@@ -148,7 +148,9 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 - Formatting lives in `data/Formatting.kt` only, and colours in `data/VictronPalette.kt` only (ARGB
   ints, because the tile knows nothing about Compose). App and tile must never diverge. Update
   labels follow the same rule: `data/update/UpdateStatusText.kt` plus `data/src/main/res` — one
-  mapping, one translation, so watch and phone describe the same state identically.
+  mapping, one translation, so watch and phone describe the same state identically. Referencing
+  those strings from an app needs the *library's* R class (`import de.universam.victron.data.R as
+  DataR`): `android.nonTransitiveRClass=true` keeps library resources out of the app's own R.
 - **Both apps keep `applicationId = de.universam.victron`** and the same signing key. The Wear OS
   Data Layer namespaces data items per package + signature — change one id and the key sync stops
   working silently. Module `namespace`s stay distinct (`.wear` / `.mobile`). For the same reason the
