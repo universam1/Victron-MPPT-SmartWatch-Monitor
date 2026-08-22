@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.universam.victron.data.Formatting
+import de.universam.victron.data.R as DataR
 import de.universam.victron.data.ScanState
 import de.universam.victron.data.ScanUnavailable
 import de.universam.victron.data.SyncResult
@@ -51,6 +52,9 @@ import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceSnapshot
 import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotStatus
+import de.universam.victron.data.update.UpdateState
+import de.universam.victron.data.update.isBusy
+import de.universam.victron.data.update.updateStatusText
 import de.universam.victron.mobile.R
 import de.universam.victron.mobile.ui.dashboard.DashboardScreen
 import kotlinx.coroutines.delay
@@ -290,17 +294,9 @@ private fun SetupContent(
                 }
             }
 
-            item {
-                val context = LocalContext.current
-                val version = context.packageManager
-                    .getPackageInfo(context.packageName, 0).versionName ?: ""
-                Text(
-                    text = "v$version",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-            }
+            item { HorizontalDivider() }
+
+            item { UpdateSection(viewModel = viewModel, config = config) }
         }
     }
 }
@@ -416,6 +412,61 @@ private fun DeviceCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Self update, because the app ships outside any store.
+ *
+ * The switch drives the background check; the button is the manual path and shows every step, so
+ * a failed download is visible instead of silently leaving the device on an old build. The labels
+ * come from `:data` so the watch says the same things.
+ */
+@Composable
+private fun UpdateSection(viewModel: VictronViewModel, config: AppConfig) {
+    val context = LocalContext.current
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(DataR.string.update_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = stringResource(DataR.string.update_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(DataR.string.update_auto))
+            Switch(
+                checked = config.autoUpdateEnabled,
+                onCheckedChange = { viewModel.setAutoUpdateEnabled(it) },
+            )
+        }
+        OutlinedButton(
+            onClick = { viewModel.updateNow() },
+            enabled = !updateState.isBusy,
+        ) {
+            Text(
+                text = updateStatusText(context, updateState),
+                color = when (updateState) {
+                    is UpdateState.Failed -> MaterialTheme.colorScheme.error
+                    is UpdateState.Ready -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
+        Text(
+            text = "v${viewModel.installedVersionName}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 

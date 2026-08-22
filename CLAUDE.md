@@ -48,7 +48,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
 | Module | Responsibility |
 |---|---|
 | `protocol` | `VictronAdvertisement` (header), `VictronCipher` (AES-CTR), `BitReader`, `records/*`, `VictronModels` |
-| `data` | `VictronScanner`, `VictronRepository`, `VictronViewModel`, `ScanWorker`/`ScanScheduler`, DataStore, `Formatting` |
+| `data` | `VictronScanner`, `VictronRepository`, `VictronViewModel`, `ScanWorker`/`ScanScheduler`, DataStore, `Formatting`, `update/*` (self update from GitHub releases) |
 | `wear` | Compose for Wear OS: scrollable gauge + detail list, tile, navigation (Hero → Overview → Devices) |
 | `mobile` | Compose Material 3 screens |
 
@@ -115,14 +115,42 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   `ScanScheduler` for a scan; the scan then calls `VictronTileService.requestUpdate`.
 - **Every surface shows the age of its data** (`Formatting.age`), and stale values are visibly
   dimmed rather than hidden.
-- **Only `BLUETOOTH_SCAN` (with `neverForLocation`).** No `BLUETOOTH_CONNECT`, no location, no
-  foreground service — we never connect, and expedited work covers background scans.
+- **Only `BLUETOOTH_SCAN` (with `neverForLocation`) for scanning, plus `INTERNET` and
+  `REQUEST_INSTALL_PACKAGES` for the self updater.** No `BLUETOOTH_CONNECT`, no location, no
+  foreground service — we never connect, and expedited work covers background scans. No
+  `POST_NOTIFICATIONS` either: the updater stages silently and reports in the settings screen, so
+  it needs no runtime prompt. Don't add one to "tell the user about an update".
+- **The self updater is the distribution channel** (`data/update/`, [docs/updates.md](docs/updates.md)).
+  The app is in no store, so it polls this repository's releases every 6 h, downloads the APK whose
+  name carries its own variant (`-wear-` / `-phone-`), checksums it against `SHA256SUMS.txt` and
+  commits a `PackageInstaller` session. Three things must not be "simplified":
+  - **`ReleaseCatalog.versionCode` mirrors `release.yml`** (`v1.2.3` → `10203`). Change one and
+    devices stop recognising releases as newer; `ReleaseCatalogTest` is what pins them together.
+  - **`ReleaseCatalog` stays Android-free and `data`'s only unit-tested logic in `update/`.** The
+    network layer takes its `HttpURLConnection` through a constructor parameter for the same
+    reason — both are testable without an SDK.
+  - **The staged APK in `cacheDir/updates` is the only bookkeeping.** Its file name carries the
+    version, so a cleared cache cannot leave a phantom "update ready" flag in DataStore. Do not
+    add a DataStore field for it.
+- **Staging and installing are separate, and below API 31 the worker must not install.** A
+  confirmation dialog cannot be started from the background, so the worker only downloads and
+  verifies; the install happens on the next foreground moment (`VictronViewModel.init`). Only
+  API 31+ may install from the worker, where a same-signature self update can run unattended
+  (`SessionParams.setRequireUserAction(USER_ACTION_NOT_REQUIRED)`) — that is what makes a test
+  fleet update itself, so don't drop that flag.
+- **Prereleases are never offered as updates.** `release.yml` gives `v1.1.0-beta1` the `versionCode`
+  of `v1.1.0`, so a prerelease can only ever tie or lose — offering one would be a no-op or a
+  downgrade attempt.
 - **Unknown record types must survive**: decrypt, keep the payload hex, show it on the Raw data
   screen. Don't throw it away and don't guess a layout.
 - Keys are matched by address first, then by the plaintext key-check byte (first key byte). Keep the
   fallback — it is what makes a changed BLE address harmless.
 - Formatting lives in `data/Formatting.kt` only, and colours in `data/VictronPalette.kt` only (ARGB
-  ints, because the tile knows nothing about Compose). App and tile must never diverge.
+  ints, because the tile knows nothing about Compose). App and tile must never diverge. Update
+  labels follow the same rule: `data/update/UpdateStatusText.kt` plus `data/src/main/res` — one
+  mapping, one translation, so watch and phone describe the same state identically. Referencing
+  those strings from an app needs the *library's* R class (`import de.universam.victron.data.R as
+  DataR`): `android.nonTransitiveRClass=true` keeps library resources out of the app's own R.
 - **Both apps keep `applicationId = de.universam.victron`** and the same signing key. The Wear OS
   Data Layer namespaces data items per package + signature — change one id and the key sync stops
   working silently. Module `namespace`s stay distinct (`.wear` / `.mobile`). For the same reason the

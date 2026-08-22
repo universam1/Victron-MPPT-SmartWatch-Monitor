@@ -204,6 +204,10 @@ public class VictronRepository internal constructor(
         configStore.updateData { it.copy(backgroundScanEnabled = enabled) }
     }
 
+    public suspend fun setAutoUpdateEnabled(enabled: Boolean) {
+        configStore.updateData { it.copy(autoUpdateEnabled = enabled) }
+    }
+
     public suspend fun setScanWindowSeconds(seconds: Int) {
         configStore.updateData { it.copy(scanWindowSeconds = seconds.coerceIn(5, 60)) }
     }

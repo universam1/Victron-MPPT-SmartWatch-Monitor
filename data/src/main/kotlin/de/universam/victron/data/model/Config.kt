@@ -29,6 +29,15 @@ public data class AppConfig(
     val backgroundScanEnabled: Boolean = false,
     /** Length of a one-shot scan window in seconds (tile enter, background worker). */
     val scanWindowSeconds: Int = 20,
+    /**
+     * Keep the app on the newest GitHub release by itself. The app ships outside any store, so
+     * without this a test device stays on whatever version was sideloaded onto it.
+     *
+     * On by default — that is the point of it — and, like [backgroundScanEnabled], deliberately
+     * **not** synced: a watch on a metered phone connection may want it off while the phone
+     * keeps it on.
+     */
+    val autoUpdateEnabled: Boolean = true,
 ) {
     public fun deviceFor(address: String): DeviceConfig? =
         devices.firstOrNull { it.address.equals(address, ignoreCase = true) }

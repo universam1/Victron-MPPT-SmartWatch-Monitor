@@ -114,6 +114,21 @@ release — they share an application id and signing key, which is what makes th
 No tag needed for a test build: every push runs [build.yml](.github/workflows/build.yml), which
 attaches debug APKs as workflow artifacts.
 
+### Test devices update themselves
+
+Because the app is in no store, every installed copy watches this repository's releases and
+installs the newer one by itself: it checks every six hours, downloads the APK that matches the
+device (`-wear-` on a watch, `-phone-` on a phone), verifies it against `SHA256SUMS.txt` and hands
+it to the platform installer. On Android 12 / Wear OS 3 and newer that completes without anybody
+tapping — a same-key self update may install unattended. So pushing a tag *is* the rollout.
+
+Both apps can turn it off (**Install updates automatically** / **Auto update** in their settings)
+and offer a manual "check for update" button that shows every step. Details, limits and the
+security model: [docs/updates.md](docs/updates.md).
+
+> Release APKs cannot replace a debug-signed build and vice versa — the signature has to match.
+> Keep test devices on release builds, or uninstall once when switching.
+
 ### Signing (optional, but do it before the first real release)
 
 Without a keystore the APKs are signed with a throwaway debug key: installable, but a later
