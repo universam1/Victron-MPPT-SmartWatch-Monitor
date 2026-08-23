@@ -38,6 +38,11 @@ public data class AppConfig(
      * keeps it on.
      */
     val autoUpdateEnabled: Boolean = true,
+    /**
+     * Keep the screen on for this many minutes while the app is visible (0 = off).
+     * Local per device — a phone plugged in may want it always on, while the watch never does.
+     */
+    val keepScreenOnMinutes: Int = 0,
 ) {
     public fun deviceFor(address: String): DeviceConfig? =
         devices.firstOrNull { it.address.equals(address, ignoreCase = true) }

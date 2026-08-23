@@ -26,7 +26,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
@@ -104,7 +103,6 @@ fun PvArcGauge(
     currentStale: Boolean = true,
     currentCharging: Boolean = false,
     currentPeakFraction: Float? = null,
-    currentStrokeWidth: Dp = 14.dp,
     modifier: Modifier = Modifier,
 ) {
     val animated by animateFloatAsState(
@@ -139,14 +137,14 @@ fun PvArcGauge(
         val valueFontSize = (diameter.value * 0.16f).coerceIn(30f, 56f).sp
         val scaleFontSize = (diameter.value * 0.04f).coerceIn(11f, 14f).sp
         Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-            val strokeWidth = 20.dp.toPx()
+            val diameterPx = minOf(size.width, size.height / ARC_HEIGHT_FRACTION)
+            val strokeWidth = (diameterPx * 0.055f).coerceIn(16.dp.toPx(), 28.dp.toPx())
             val glowWidth = strokeWidth + 8.dp.toPx()
             val inset = glowWidth / 2f
             // Draw a circle in whatever box we got: an extreme window aspect ratio must not turn
             // the gauge into an ellipse. It hangs from the top edge, so the part left outside the
             // box is the empty bottom of the arc — which is why ArcSpec.center, and not
             // DrawScope.center, is what everything angular pivots on.
-            val diameterPx = minOf(size.width, size.height / ARC_HEIGHT_FRACTION)
             val spec = ArcSpec(
                 topLeft = Offset((size.width - diameterPx) / 2f + inset, inset),
                 size = Size(diameterPx - glowWidth, diameterPx - glowWidth),
@@ -180,7 +178,7 @@ fun PvArcGauge(
             }
 
             // Battery current arc — shares the same circle, fills the gap at the bottom.
-            val currentStrokePx = currentStrokeWidth.toPx()
+            val currentStrokePx = strokeWidth * 0.7f
             val currentGlowPx = currentStrokePx + 8.dp.toPx()
             val currentSpec = ArcSpec(
                 topLeft = spec.topLeft,

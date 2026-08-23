@@ -71,6 +71,66 @@ The watch also works entirely on its own: it lists every Victron device in range
 > Both APKs must come from the same build — they share an `applicationId` and signing key, which is
 > what allows the Data Layer to connect them. `./build.sh apk` builds both, so this is automatic.
 
+## Features
+
+### Watch app (Wear OS)
+
+- **Real-time arc gauges** — a 240° PV power arc and a 104° battery current arc on one circle,
+  painted with a sweep heat gradient (white → solar yellow → orange → red for power; green → yellow-green → orange for current)
+- **Peak markers** — a thin radial tick on each arc at the highest value in today's trend window,
+  animated with the fill so a new high and its value move together
+- **Sparkline trends** — inside the arc gauge, showing the full runtime history with decimation
+  (not a sliding window — starts at first reading, merges buckets as it fills)
+- **Battery detail button** — a single merged row showing voltage, current, and charging power
+  (e.g. "13.2 V  1.8 A  24 W")
+- **Multi-device support** — swipe between configured devices via the Overview screen
+- **Tile** — at-a-glance power reading using the same gauge as the app; triggers a short BLE scan
+  when viewed and refreshes itself when the scan completes
+- **Data age indicator** — always visible; values dim and age turns red when stale
+- **Ambient mode** — the display stays informative when the screen goes dim
+- **Scrollable detail list** — charger state, errors, yield today, load output, raw data
+
+### Phone app
+
+- **Dashboard** — the same combined arc ring gauge (PV power + battery current) at full screen width,
+  with trend sparklines on every metric
+- **Value tiles** — voltage, yield today, charger state, load current — each with its own sparkline
+- **Adaptive layout** — one scrolling column in portrait; two columns with a height-sized gauge in
+  landscape, determined by window shape (`maxWidth > maxHeight`), not orientation
+- **Head unit mode** — proportionally scaled arcs and tiles on large / non-compact screens
+- **Keep-screen-on timer** — configurable: Off / 5 / 10 / 30 / 60 minutes
+- **Multi-device support** — swipe between devices
+- **Edge-to-edge** — gradients run behind system bars, content respects safe insets and cutouts
+
+### Data layer (shared)
+
+- **Connectionless BLE** — reads Victron *Instant Readout* advertisements without connecting;
+  VictronConnect keeps working, no pairing required, minimal battery drain
+- **AES-CTR decryption** — decrypts the encrypted payload with your device's key (little-endian
+  128-bit counter, not JCE's big-endian — multi-block payloads decrypt correctly)
+- **Model-aware gauge scaling** — derives full scale from the charger's name (e.g. *MPPT 100/20*
+  → 20 A current, 20 A × battery voltage for power); unknown models fall back to observed peak
+- **Trend history** — persisted across app restarts, day-truncated; each merged bucket keeps the
+  extreme with its sign so peaks and discharge spikes are never averaged away
+- **Self-update from GitHub releases** — polls every 6 hours, downloads the matching APK
+  (`-wear-` or `-phone-`), verifies against `SHA256SUMS.txt`, installs silently on Android 12+
+- **Config sync** — device keys and labels sync between watch and phone via the Wear Data Layer
+  (per-device last-write-wins union; removals stay local)
+- **Background scanning** — expedited WorkManager jobs, bounded ~12 s windows; never scans
+  continuously
+- **Unknown record types preserved** — decrypted, kept as hex, shown on the Raw data screen
+
+### Permissions (minimal)
+
+| Permission | Why |
+|---|---|
+| `BLUETOOTH_SCAN` (`neverForLocation`) | Receive BLE advertisements |
+| `INTERNET` | Check for updates on GitHub |
+| `REQUEST_INSTALL_PACKAGES` | Stage and install self-updates |
+
+No `BLUETOOTH_CONNECT`, no location permission, no foreground service — we never connect to the
+charger and expedited work covers background scans.
+
 ## What it shows
 
 | | |

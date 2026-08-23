@@ -1,5 +1,7 @@
 package de.universam.victron.mobile.ui
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -102,6 +105,20 @@ fun MobileApp(viewModel: VictronViewModel = viewModel()) {
     DisposableEffect(Unit) {
         viewModel.startLiveScan()
         onDispose { viewModel.stopLiveScan() }
+    }
+
+    // Keep the screen on for the configured duration, then release.
+    val keepMinutes by viewModel.keepScreenOnMinutes.collectAsStateWithLifecycle()
+    val activity = LocalContext.current as? Activity
+    LaunchedEffect(keepMinutes) {
+        val window = activity?.window ?: return@LaunchedEffect
+        if (keepMinutes > 0) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            delay(keepMinutes * 60_000L)
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -285,6 +302,27 @@ private fun SetupContent(
                         checked = config.backgroundScanEnabled,
                         onCheckedChange = { viewModel.setBackgroundScanEnabled(it) },
                     )
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.keep_screen_on))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val options = listOf(0, 5, 10, 30, 60)
+                        options.forEach { minutes ->
+                            FilterChip(
+                                selected = config.keepScreenOnMinutes == minutes,
+                                onClick = { viewModel.setKeepScreenOnMinutes(minutes) },
+                                label = {
+                                    Text(
+                                        if (minutes == 0) stringResource(R.string.keep_screen_on_off)
+                                        else stringResource(R.string.keep_screen_on_minutes, minutes),
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
             }
 

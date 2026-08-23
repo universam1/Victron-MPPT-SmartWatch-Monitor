@@ -21,6 +21,10 @@
 
     <string name="background_scan">Background scan (~15 min)</string>
 
+    <string name="keep_screen_on">Keep screen on</string>
+    <string name="keep_screen_on_off">Off</string>
+    <string name="keep_screen_on_minutes">%1$d min</string>
+
     <string name="sync_title">Watch</string>
     <string name="sync_hint">Keys and settings sync automatically when changed. This button forces an immediate exchange.</string>
     <string name="sync_now">Sync to watch now</string>

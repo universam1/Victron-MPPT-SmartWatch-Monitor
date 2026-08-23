@@ -21,6 +21,10 @@
 
     <string name="background_scan">Hintergrund-Scan (~15 min)</string>
 
+    <string name="keep_screen_on">Display anlassen</string>
+    <string name="keep_screen_on_off">Aus</string>
+    <string name="keep_screen_on_minutes">%1$d Min.</string>
+
     <string name="sync_title">Uhr</string>
     <string name="sync_hint">Schlüssel und Einstellungen werden automatisch synchronisiert. Dieser Button erzwingt einen sofortigen Abgleich.</string>
     <string name="sync_now">Jetzt zur Uhr synchronisieren</string>

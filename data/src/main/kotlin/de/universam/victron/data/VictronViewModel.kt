@@ -223,6 +223,14 @@ public open class VictronViewModel(application: Application) : AndroidViewModel(
         }
     }
 
+    public val keepScreenOnMinutes: StateFlow<Int> = repository.config
+        .map { it.keepScreenOnMinutes }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    public fun setKeepScreenOnMinutes(minutes: Int) {
+        viewModelScope.launch { repository.setKeepScreenOnMinutes(minutes) }
+    }
+
     /** One-shot background scan, e.g. from a "scan now" button. */
     public fun requestScanNow() {
         ScanScheduler.requestScanNow(getApplication<Application>())

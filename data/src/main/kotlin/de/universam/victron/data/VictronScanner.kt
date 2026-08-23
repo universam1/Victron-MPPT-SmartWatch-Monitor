@@ -99,7 +99,8 @@ public class VictronScanner(context: Context) {
     public fun advertisements(aggressiveness: ScanAggressiveness): Flow<RawAdvertisement> = callbackFlow {
         canScan()?.let { throw ScanUnavailableException(it) }
 
-        val scanner = appContext.getSystemService(BluetoothManager::class.java)!!.adapter.bluetoothLeScanner
+        val scanner = appContext.getSystemService(BluetoothManager::class.java)
+            ?.adapter?.bluetoothLeScanner
             ?: throw ScanUnavailableException(ScanUnavailable.NoLeSupport)
 
         val callback = object : ScanCallback() {
@@ -134,7 +135,13 @@ public class VictronScanner(context: Context) {
             .setReportDelay(0)
             .build()
 
-        scanner.startScan(listOf(VICTRON_FILTER), settings, callback)
+        try {
+            scanner.startScan(listOf(VICTRON_FILTER), settings, callback)
+        } catch (e: Exception) {
+            Log.w(TAG, "startScan threw", e)
+            close(ScanUnavailableException(ScanUnavailable.Failed(-1)))
+            return@callbackFlow
+        }
         Log.d(TAG, "BLE scan started ($aggressiveness)")
 
         awaitClose {

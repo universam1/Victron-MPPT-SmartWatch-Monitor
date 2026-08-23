@@ -1,5 +1,7 @@
 package de.universam.victron.data.model
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.abs
 
 /**
@@ -19,6 +21,7 @@ import kotlin.math.abs
  *
  * Immutable: [append] returns a new instance, so the whole buffer is a value the UI can hold.
  */
+@Serializable
 public data class MetricSeries(
     /** One value per committed bucket, oldest first; each the extreme of its bucket's samples. */
     public val values: List<Float> = emptyList(),
@@ -47,9 +50,11 @@ public data class MetricSeries(
      * What a sparkline draws: the committed buckets plus the bucket still filling, so the tip keeps
      * moving on every reading even once one bucket spans a hundred of them.
      */
+    @Transient
     public val points: List<Float> = pendingPeak?.let { values + it } ?: values
 
     /** The most extreme sample in the window, sign kept. `null` while empty. */
+    @Transient
     public val peak: Float? = points.maxByOrNull { abs(it) }
 
     /**
@@ -58,6 +63,7 @@ public data class MetricSeries(
      * clock made up of two five-minute bursts. It answers "how old is the left edge", which is what
      * the label next to a trend claims.
      */
+    @Transient
     public val spanMillis: Long =
         if (firstSampleMillis == null || lastSampleMillis == null) {
             0L

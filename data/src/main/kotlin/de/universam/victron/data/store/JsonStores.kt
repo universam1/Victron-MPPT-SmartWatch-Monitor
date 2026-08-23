@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.Serializer
 import androidx.datastore.dataStoreFile
 import de.universam.victron.data.model.AppConfig
+import de.universam.victron.data.model.HistoryCache
 import de.universam.victron.data.model.SnapshotCache
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -48,4 +49,10 @@ internal fun createSnapshotStore(context: Context): DataStore<SnapshotCache> =
     DataStoreFactory.create(
         serializer = JsonSerializer(SnapshotCache.serializer(), SnapshotCache()),
         produceFile = { context.dataStoreFile("victron-snapshots.json") },
+    )
+
+internal fun createHistoryStore(context: Context): DataStore<HistoryCache> =
+    DataStoreFactory.create(
+        serializer = JsonSerializer(HistoryCache.serializer(), HistoryCache()),
+        produceFile = { context.dataStoreFile("victron-history.json") },
     )

@@ -2,6 +2,7 @@ package de.universam.victron.data
 
 import android.content.Context
 import de.universam.victron.data.store.createConfigStore
+import de.universam.victron.data.store.createHistoryStore
 import de.universam.victron.data.store.createSnapshotStore
 import de.universam.victron.data.update.UpdateManager
 
@@ -35,6 +36,7 @@ public object VictronData {
                     scanner = VictronScanner(appContext),
                     configStore = createConfigStore(appContext),
                     snapshotStore = createSnapshotStore(appContext),
+                    historyStore = createHistoryStore(appContext),
                 ).also { repository = it }
             }
         }

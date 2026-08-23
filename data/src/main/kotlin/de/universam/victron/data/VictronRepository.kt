@@ -6,8 +6,10 @@ import androidx.datastore.core.DataStore
 import de.universam.victron.data.model.AppConfig
 import de.universam.victron.data.model.DeviceConfig
 import de.universam.victron.data.model.DeviceSnapshot
+import de.universam.victron.data.model.HistoryCache
 import de.universam.victron.data.model.ReadingHistory
 import de.universam.victron.data.model.SnapshotCache
+import de.universam.victron.data.model.localDayIndex
 import de.universam.victron.data.sync.ConfigSync
 import de.universam.victron.protocol.DecodeResult
 import de.universam.victron.protocol.ParseResult
@@ -15,12 +17,14 @@ import de.universam.victron.protocol.VictronAdvertisement
 import de.universam.victron.protocol.VictronCipher
 import de.universam.victron.protocol.VictronDecoder
 import de.universam.victron.protocol.VictronHeader
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -36,6 +40,7 @@ public class VictronRepository internal constructor(
     private val scanner: VictronScanner,
     private val configStore: DataStore<AppConfig>,
     private val snapshotStore: DataStore<SnapshotCache>,
+    private val historyStore: DataStore<HistoryCache>,
 ) {
 
     private val _snapshots = MutableStateFlow<Map<String, DeviceSnapshot>>(emptyMap())
@@ -46,7 +51,7 @@ public class VictronRepository internal constructor(
     /** Newest snapshot per BLE address, keyed by uppercase address. */
     public val snapshots: StateFlow<Map<String, DeviceSnapshot>> = _snapshots.asStateFlow()
 
-    /** Value history per device address (in-memory only, not persisted). */
+    /** Value history per device address, persisted across restarts but truncated daily. */
     public val history: StateFlow<Map<String, ReadingHistory>> = _history.asStateFlow()
 
     public val config: Flow<AppConfig> = configStore.data
@@ -61,6 +66,12 @@ public class VictronRepository internal constructor(
         val cached = snapshotStore.data.first().snapshots
         if (cached.isNotEmpty() && _snapshots.value.isEmpty()) {
             _snapshots.value = cached.associateBy { it.address.uppercase() }
+        }
+        // Load persisted history, discarding data from previous days.
+        val today = localDayIndex(System.currentTimeMillis())
+        val stored = historyStore.data.first().devices
+        if (stored.isNotEmpty() && _history.value.isEmpty()) {
+            _history.value = stored.filterValues { it.dayIndex == today }
         }
         cacheLoaded = true
     }
@@ -85,7 +96,10 @@ public class VictronRepository internal constructor(
         withTimeoutOrNull(durationMillis) {
             collectAdvertisements(aggressiveness) { count++ }
         }
-        if (count > 0) persistSnapshots()
+        if (count > 0) {
+            persistSnapshots()
+            persistHistory()
+        }
         return count
     }
 
@@ -118,7 +132,15 @@ public class VictronRepository internal constructor(
         // re-process whatever is currently on the air.
         val lastReading = HashMap<String, Int>()
 
-        scanner.advertisements(aggressiveness).collect { raw ->
+        scanner.advertisements(aggressiveness).retryWhen { cause, attempt ->
+            if (cause is ScanUnavailableException && attempt < 3) {
+                Log.w(TAG, "Scan failed (attempt $attempt), retrying: ${cause.reason}")
+                delay(2000L * (attempt + 1))
+                true
+            } else {
+                false
+            }
+        }.collect { raw ->
             val header = (VictronAdvertisement.parse(raw.manufacturerData) as? ParseResult.Success)?.header
                 ?: return@collect
             val address = raw.address.uppercase()
@@ -132,6 +154,8 @@ public class VictronRepository internal constructor(
             appendHistory(address, snapshot)
             onSnapshot(snapshot)
         }
+        // Persist trend data when the scan session ends (caller cancellation or normal completion).
+        persistHistory()
     }
 
     /** Writes the current snapshots to disk so the tile survives a process death. */
@@ -140,11 +164,25 @@ public class VictronRepository internal constructor(
         snapshotStore.updateData { SnapshotCache(current) }
     }
 
+    private var historyDirty = false
+
     private fun appendHistory(address: String, snapshot: DeviceSnapshot) {
         val values = snapshot.solarCharger ?: return
         val current = _history.value
         val h = current[address] ?: ReadingHistory()
         _history.value = current + (address to h.append(values, snapshot.receivedAtEpochMillis))
+        historyDirty = true
+    }
+
+    /**
+     * Persists the trend history to disk. Called when a scan stops (after [scanOnce] completes and
+     * at each [collectAdvertisements] cancellation) so disk writes are bounded by scan sessions,
+     * not by advertisement rate.
+     */
+    public suspend fun persistHistory() {
+        if (!historyDirty) return
+        historyDirty = false
+        historyStore.updateData { HistoryCache(_history.value) }
     }
 
     private fun decode(
@@ -210,6 +248,10 @@ public class VictronRepository internal constructor(
 
     public suspend fun setScanWindowSeconds(seconds: Int) {
         configStore.updateData { it.copy(scanWindowSeconds = seconds.coerceIn(5, 60)) }
+    }
+
+    public suspend fun setKeepScreenOnMinutes(minutes: Int) {
+        configStore.updateData { it.copy(keepScreenOnMinutes = minutes.coerceIn(0, 60)) }
     }
 
     // ---- phone <-> watch sync ------------------------------------------------------------

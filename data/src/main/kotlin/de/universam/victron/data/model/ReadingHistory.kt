@@ -1,5 +1,6 @@
 package de.universam.victron.data.model
 
+import kotlinx.serialization.Serializable
 import java.util.TimeZone
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -13,12 +14,11 @@ internal fun localDayIndex(epochMillis: Long, zone: TimeZone = TimeZone.getDefau
     Math.floorDiv(epochMillis + zone.getOffset(epochMillis), MILLIS_PER_DAY).toInt()
 
 /**
- * In-memory trend buffer per device, one [MetricSeries] per metric.
+ * Trend buffer per device, one [MetricSeries] per metric.
  *
  * Each series spans the whole time the app has been running rather than a fixed sliding window —
- * see [MetricSeries] for how that stays bounded. Not persisted and deliberately not
- * `@Serializable`: the window is "since the app started, within today", so a process restart
- * legitimately starts over and none of this belongs in `SnapshotCache`.
+ * see [MetricSeries] for how that stays bounded. Persisted to disk so sparklines survive app
+ * restarts; data from previous days is truncated on the first reading of a new day.
  *
  * The window is at most the current local day. A reading from a different local day resets *every*
  * series — including the ones that reading does not carry. Doing the day check per metric instead
@@ -28,6 +28,7 @@ internal fun localDayIndex(epochMillis: Long, zone: TimeZone = TimeZone.getDefau
  *
  * Immutable: [append] returns a new instance so the containing StateFlow emits a new value.
  */
+@Serializable
 public data class ReadingHistory(
     public val pvPowerW: MetricSeries = MetricSeries(),
     public val batteryCurrent: MetricSeries = MetricSeries(),
@@ -81,3 +82,9 @@ private fun MetricSeries.appendedFromDayCounter(value: Float?, atMillis: Long): 
     points.lastOrNull()?.let { value < it } == true -> cleared().append(value, atMillis)
     else -> append(value, atMillis)
 }
+
+/** Persisted cache of trend history per device. */
+@Serializable
+public data class HistoryCache(
+    val devices: Map<String, ReadingHistory> = emptyMap(),
+)

@@ -134,7 +134,6 @@ fun DeviceDashboard(
                             currentStale = stale,
                             currentCharging = (values?.batteryCurrent ?: 0.0) > 0.05,
                             currentPeakFraction = snapshot?.batteryCurrentPeakFraction(history),
-                            currentStrokeWidth = if (compact) 10.dp else 14.dp,
                             matchHeightFirst = true,
                         )
                     }
