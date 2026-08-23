@@ -130,6 +130,11 @@ fun DeviceDashboard(
                             stale = stale,
                             series = history?.pvPowerW,
                             peakFraction = snapshot?.pvPeakFraction(history),
+                            currentFraction = snapshot?.batteryCurrentFraction() ?: 0f,
+                            currentStale = stale,
+                            currentCharging = (values?.batteryCurrent ?: 0.0) > 0.05,
+                            currentPeakFraction = snapshot?.batteryCurrentPeakFraction(history),
+                            currentStrokeWidth = if (compact) 10.dp else 14.dp,
                             matchHeightFirst = true,
                         )
                     }
@@ -146,12 +151,7 @@ fun DeviceDashboard(
                             maxAmps = snapshot?.batteryCurrentMaxA(),
                             stale = stale,
                             series = history?.batteryCurrent,
-                            peakFraction = snapshot?.batteryCurrentPeakFraction(history),
-                            // Vertical space is scarce on a phone landscape;
-                            // head units (>=500dp tall) get a moderate trend and a bigger arc.
                             sparklineHeight = if (compact) 36.dp else 48.dp,
-                            maxArcHeight = if (compact) 48.dp else 88.dp,
-                            strokeWidth = if (compact) 10.dp else 16.dp,
                         )
                         ValueTiles(
                             values = values,
@@ -169,7 +169,7 @@ fun DeviceDashboard(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    // PV Arc Gauge — dominant visual, with sparkline inside
+                    // PV Arc Gauge — dominant visual, with current arc in the bottom gap
                     PvArcGauge(
                         fraction = snapshot?.pvFraction() ?: 0f,
                         watts = values?.pvPowerW,
@@ -177,6 +177,10 @@ fun DeviceDashboard(
                         stale = stale,
                         series = history?.pvPowerW,
                         peakFraction = snapshot?.pvPeakFraction(history),
+                        currentFraction = snapshot?.batteryCurrentFraction() ?: 0f,
+                        currentStale = stale,
+                        currentCharging = (values?.batteryCurrent ?: 0.0) > 0.05,
+                        currentPeakFraction = snapshot?.batteryCurrentPeakFraction(history),
                         modifier = Modifier.fillMaxWidth(),
                     )
 
@@ -185,7 +189,6 @@ fun DeviceDashboard(
                         maxAmps = snapshot?.batteryCurrentMaxA(),
                         stale = stale,
                         series = history?.batteryCurrent,
-                        peakFraction = snapshot?.batteryCurrentPeakFraction(history),
                     )
 
                     ValueTiles(values = values, history = history, stale = stale)

@@ -99,13 +99,9 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   The observed peaks are all-time and persisted, and must stay that way — they are what scales an
   unknown model's gauge. Using them for the tick would pin it at last week's noon. Keep the
   asymmetry.
-- **`CurrentArcGauge` reserves a band, not a square, and gives up width before height.** A 104° arc's
-  visible band is `0.384·r` tall and `1.576·r` wide — a fixed ~1:4.1 shape, so width and height
-  cannot both be satisfied. The band is `r·0.384 + glow` with the circle's centre placed *above* the
-  widget (`cy = glow/2 − 0.616·r`), the mirror image of `PvArcGauge`; the radius is the smaller of
-  what the width allows and what `maxArcHeight` allows, and a height-bound arc gets narrower and
-  centres itself rather than turning into an ellipse. Widening the sweep makes it *taller*, not
-  shorter — do not "fix" a cramped landscape by opening the arc up.
+- **`CurrentArcGauge` is text-only; its arc lives inside `PvArcGauge`.** The 104° current arc shares
+  the PV arc's circle (same centre, same radius, thinner stroke), drawn in the gap at the bottom.
+  `CurrentArcGauge` provides only the label, value, and sparkline row beneath the combined gauge.
 - **The UI observes snapshots and history through `throttleLatest` (2 Hz), the repository does not.**
   Every emission redraws the gradient arc gauges and sparklines, so the cap is about redraw cost;
   the repository still records every reading, which is what keeps the history buffer complete. Use
@@ -176,13 +172,15 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   arrangements call the *same* `DashboardHeader`/`ValueTiles`/`PvArcGauge`/`CurrentArcGauge` — only
   `maxArcHeight`/`strokeWidth`/`sparklineHeight` differ between them, never the composable. Don't
   fork them into two layouts that drift. Deriving the square gauge from the width in landscape is the bug this replaced.
-- **`PvArcGauge` reserves 0.8 of its diameter in height, not a full square** (`ARC_HEIGHT_FRACTION`):
-  the 240° arc's tips sit half a radius below the centre, so a square box always ended in an empty
-  band, and that band pushed the bottom tiles off a portrait screen. The circle hangs from the top of
-  the box — which is why the sweep gradient and the rotation pivot use the computed `arcCenter` and
-  not the DrawScope `center`, and why the value text is offset down into it. **Never give the gauge a
-  fixed height** (`fillMaxHeight`/`fillMaxSize` inside a bounded box): that leaves its aspect ratio no
-  way to also honour the width, and it overflows its column instead of shrinking.
+- **`PvArcGauge` reserves 0.96 of its diameter in height** (`ARC_HEIGHT_FRACTION`):
+  it draws both the 240° PV arc and the 104° battery current arc on the same circle (matching the
+  watch's ring layout). The current arc fills the gap at the bottom, so the box is nearly square —
+  0.96 leaves just enough margin for the current arc's glow at the nadir. The circle hangs from the
+  top of the box — which is why the sweep gradient and the rotation pivot use the computed
+  `arcCenter` and not the DrawScope `center`, and why the value text is offset down into it.
+  **Never give the gauge a fixed height** (`fillMaxHeight`/`fillMaxSize` inside a bounded box): that
+  leaves its aspect ratio no way to also honour the width, and it overflows its column instead of
+  shrinking.
 - **The phone app is edge-to-edge**: gradients may run behind the system bars, content must be
   inset (`safeDrawingPadding`), or a landscape navigation bar and display cutouts clip it.
 - **The hero gauge item is sized with `Modifier.fillParentMaxSize()`** (the `ScalingLazyListItemScope`
@@ -213,7 +211,7 @@ The arc gauges paint a **sweep gradient along their length** (not a flat color):
 |---|---|---|
 | PV power (wear + mobile) | 240°, starts 150° | `HEAT_LOW` white → `HEAT_MID_LOW` SOLAR yellow → `HEAT_MID` dark orange → `HEAT_HIGH` fire-red |
 | Battery current (wear) | 104°, starts 38° | `CURRENT_LOW` green → `CURRENT_MID` yellow-green → `CURRENT_HIGH` orange |
-| Battery current (mobile) | 104°, starts 38° — same arc, radius from the row width, height-capped | same `CURRENT_*` stops when charging; flat `DISCHARGING` orange when the current is negative |
+| Battery current (mobile) | 104°, starts 38° — same circle as the PV arc inside `PvArcGauge` | same `CURRENT_*` stops when charging; flat `DISCHARGING` orange when the current is negative |
 
 Four stops on the PV arc, not three: `HEAT_LOW` is white, and the SOLAR yellow is `HEAT_MID_LOW`.
 
@@ -223,9 +221,10 @@ never the tip colour — wear the first stop at α 0.25, mobile `HEAT_MID_LOW` (
 α 0.35, because mobile's first stop is white and a white glow washes the arc out.
 
 The mobile arcs are drawn through one helper, `mobile/.../dashboard/GaugeArc.kt`
-(`ArcSpec` + `drawArcTrack`/`drawArcFill`/`drawPeakTick`), so the power gauge, the current gauge and
-the peak tick cannot drift apart. Wear keeps its own `PowerArc` — the modules do not depend on each
-other, and the numbers that must agree live in `data`.
+(`ArcSpec` + `drawArcTrack`/`drawArcFill`/`drawPeakTick`), and both live in `PvArcGauge`'s Canvas
+on the same circle — the power gauge, the current gauge and the peak tick cannot drift apart. Wear
+keeps its own `PowerArc` — the modules do not depend on each other, and the numbers that must agree
+live in `data`.
 
 When **stale**, all four arcs fall back to flat `TEXT_DIM` (no gradient).
 

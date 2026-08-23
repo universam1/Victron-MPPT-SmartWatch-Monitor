@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.universam.victron.data.Formatting
@@ -36,14 +37,18 @@ import de.universam.victron.mobile.R
 private const val START_ANGLE = 150f
 private const val SWEEP_ANGLE = 240f
 
+/** The battery current arc shares this circle — same geometry as on the watch. */
+private const val CURRENT_START_ANGLE = 38f
+private const val CURRENT_SWEEP_ANGLE = 104f
+
 /**
- * Height the gauge reserves, as a fraction of its circle's diameter. The 240° arc opens downwards:
- * its tips sit at `sin(30°) = 0.5·r` below the centre, so the bottom quarter of a square box is
- * always empty. Reserving 0.8 instead of 1.0 keeps that dead band out of the layout — which is what
- * lets the tiles below fit on a phone portrait screen — while leaving the round caps and their glow
- * room below the tips. The circle is drawn from the top of the box, not centred in it.
+ * Height the gauge reserves, as a fraction of its circle's diameter. Both arcs together form a
+ * near-complete ring: the PV arc (240°) fills the top and the current arc (104°) fills the bottom
+ * gap. The current arc's lowest point is at 90° (full radius below centre), so the box must be
+ * nearly square. 0.96 leaves a small margin for the current arc's glow at the nadir while keeping
+ * a slight height saving vs. a full square.
  */
-private const val ARC_HEIGHT_FRACTION = 0.8f
+private const val ARC_HEIGHT_FRACTION = 0.96f
 
 /** Smallest gauge that still has room for a trend inside the arc. */
 private val SPARKLINE_MIN_DIAMETER = 220.dp
@@ -51,6 +56,7 @@ private val SPARKLINE_MIN_DIAMETER = 220.dp
 private val SOLAR = Color(VictronPalette.SOLAR)
 private val TRACK = Color(0xFF1A2332)
 private val TEXT_DIM = Color(VictronPalette.TEXT_DIM)
+private val DISCHARGING = Color(VictronPalette.DISCHARGING)
 
 /** White → SOLAR yellow → dark orange → fire-red along the length of the arc. */
 private val HEAT_GRADIENT = listOf(
@@ -60,19 +66,26 @@ private val HEAT_GRADIENT = listOf(
     Color(VictronPalette.HEAT_HIGH),
 )
 
+/** Green → yellow-green → orange along the length of the current arc. */
+private val CURRENT_GRADIENT = listOf(
+    Color(VictronPalette.CURRENT_LOW),
+    Color(VictronPalette.CURRENT_MID),
+    Color(VictronPalette.CURRENT_HIGH),
+)
+
 /**
- * Large animated arc gauge showing PV power. A glow arc drawn behind the main arc gives depth;
- * the watts value sits centered inside with an optional trend below.
+ * Large animated arc gauge showing PV power and battery current on the same circle — matching the
+ * watch's ring layout where the 240° PV arc and the 104° current arc form a near-complete ring.
  *
  * [peakFraction] marks the highest power in the trend window with a tick across the track — see
  * `DeviceSnapshot.pvPeakFraction`, which scales it by the same full scale as [fraction] so the tick
  * and the fill cannot disagree. `null` means there is nothing to mark yet.
  *
- * The gauge is a circle that reserves only [ARC_HEIGHT_FRACTION] of its diameter in height, because
- * the arc leaves the bottom of its square empty. Pass [matchHeightFirst] when the height is the
- * constrained dimension — in a landscape two-column layout, deriving the circle from the available
- * *width* would make it taller than the screen. Type sizes inside follow the resolved size, so the
- * same composable works at the full width of a portrait phone and at the height of a landscape one.
+ * The gauge is a circle that reserves only [ARC_HEIGHT_FRACTION] of its diameter in height. Pass
+ * [matchHeightFirst] when the height is the constrained dimension — in a landscape two-column
+ * layout, deriving the circle from the available *width* would make it taller than the screen.
+ * Type sizes inside follow the resolved size, so the same composable works at the full width of a
+ * portrait phone and at the height of a landscape one.
  *
  * Give it at most one fixed dimension: the aspect ratio picks whichever of width and height keeps
  * the circle inside its box, and a `fillMaxSize`/`fillMaxHeight` that fixes both leaves it no
@@ -87,6 +100,11 @@ fun PvArcGauge(
     series: MetricSeries? = null,
     peakFraction: Float? = null,
     matchHeightFirst: Boolean = false,
+    currentFraction: Float = 0f,
+    currentStale: Boolean = true,
+    currentCharging: Boolean = false,
+    currentPeakFraction: Float? = null,
+    currentStrokeWidth: Dp = 14.dp,
     modifier: Modifier = Modifier,
 ) {
     val animated by animateFloatAsState(
@@ -94,12 +112,20 @@ fun PvArcGauge(
         animationSpec = tween(durationMillis = 800),
         label = "pv-arc",
     )
-    // Animated with the same spec as the fill: a new high arrives in the same frame as the value
-    // that set it, and animating both keeps them together instead of the tick jumping ahead.
     val animatedPeak by animateFloatAsState(
         targetValue = (peakFraction ?: 0f).coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 800),
         label = "pv-arc-peak",
+    )
+    val animatedCurrent by animateFloatAsState(
+        targetValue = currentFraction.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 800),
+        label = "current-arc",
+    )
+    val animatedCurrentPeak by animateFloatAsState(
+        targetValue = (currentPeakFraction ?: 0f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 800),
+        label = "current-arc-peak",
     )
 
     BoxWithConstraints(
@@ -150,6 +176,46 @@ fun PvArcGauge(
                     spec = spec,
                     peakFraction = animatedPeak,
                     color = if (stale) TEXT_DIM.copy(alpha = 0.7f) else Color(VictronPalette.PEAK_MARKER),
+                )
+            }
+
+            // Battery current arc — shares the same circle, fills the gap at the bottom.
+            val currentStrokePx = currentStrokeWidth.toPx()
+            val currentGlowPx = currentStrokePx + 8.dp.toPx()
+            val currentSpec = ArcSpec(
+                topLeft = spec.topLeft,
+                size = spec.size,
+                startAngle = CURRENT_START_ANGLE,
+                sweepAngle = CURRENT_SWEEP_ANGLE,
+                strokeWidth = currentStrokePx,
+                glowWidth = currentGlowPx,
+            )
+
+            val currentGradient = if (currentStale) null else if (currentCharging) CURRENT_GRADIENT else null
+            val currentFlatColor = when {
+                currentStale -> TEXT_DIM
+                currentCharging -> CURRENT_GRADIENT.first()
+                else -> DISCHARGING
+            }
+            val currentGlowColor = when {
+                currentStale -> TEXT_DIM.copy(alpha = 0.25f)
+                currentCharging -> CURRENT_GRADIENT.first().copy(alpha = 0.25f)
+                else -> DISCHARGING.copy(alpha = 0.25f)
+            }
+
+            drawArcTrack(currentSpec, TRACK)
+            drawArcFill(
+                spec = currentSpec,
+                fraction = animatedCurrent,
+                gradient = currentGradient,
+                flatColor = currentFlatColor,
+                glowColor = currentGlowColor,
+            )
+            if (currentPeakFraction != null) {
+                drawPeakTick(
+                    spec = currentSpec,
+                    peakFraction = animatedCurrentPeak,
+                    color = if (currentStale) TEXT_DIM.copy(alpha = 0.7f) else Color(VictronPalette.PEAK_MARKER),
                 )
             }
         }

@@ -185,6 +185,9 @@ fun PreviewPvArcGauge() {
             stale = false,
             // No peak: the gauge must still render before any history exists.
             peakFraction = null,
+            currentFraction = 0.5f,
+            currentStale = false,
+            currentCharging = true,
         )
     }
 }
@@ -204,6 +207,10 @@ fun PreviewPvArcGaugePeak() {
             scaleMaxW = 403,
             stale = false,
             peakFraction = 0.88f,
+            currentFraction = 0.5f,
+            currentStale = false,
+            currentCharging = true,
+            currentPeakFraction = 0.87f,
         )
     }
 }
@@ -223,70 +230,67 @@ fun PreviewPvArcGaugeStalePeak() {
             scaleMaxW = 403,
             stale = true,
             peakFraction = 0.88f,
+            currentFraction = 0.5f,
+            currentStale = true,
+            currentPeakFraction = 0.87f,
         )
     }
 }
 
 @PreviewTest
-@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 260)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 180)
 @Composable
 fun PreviewCurrentArcCharging() {
-    Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(BG_BRUSH).padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(BG_BRUSH).padding(16.dp)) {
         CurrentArcGauge(
             amps = 15.0,
             maxAmps = 30.0,
             stale = false,
             series = sampleHistory.batteryCurrent,
-            peakFraction = 0.87f,
         )
     }
 }
 
 /** Discharging: flat orange instead of the charging gradient, and a tick close to the start. */
 @PreviewTest
-@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 260)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 180)
 @Composable
 fun PreviewCurrentArcDischarging() {
-    Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(BG_BRUSH).padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(BG_BRUSH).padding(16.dp)) {
         CurrentArcGauge(
             amps = -2.8,
             maxAmps = 30.0,
             stale = false,
-            peakFraction = 0.14f,
         )
     }
 }
 
 /** Zero and no history: the minimal dot must still make the arc identifiable, with no tick. */
 @PreviewTest
-@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 260)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 350, heightDp = 180)
 @Composable
 fun PreviewCurrentArcZero() {
-    Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(BG_BRUSH).padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(BG_BRUSH).padding(16.dp)) {
         CurrentArcGauge(
             amps = 0.0,
             maxAmps = 30.0,
             stale = false,
-            peakFraction = null,
         )
     }
 }
 
-/** The landscape branch in isolation: a height-bound arc gives up width and centres itself. */
+/** The landscape branch in isolation: a height-bound section gives up vertical space. */
 @PreviewTest
-@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 380, heightDp = 170)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 380, heightDp = 130)
 @Composable
 fun PreviewCurrentArcCompact() {
-    Box(modifier = Modifier.fillMaxWidth().height(170.dp).background(BG_BRUSH).padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().height(130.dp).background(BG_BRUSH).padding(16.dp)) {
         CurrentArcGauge(
             amps = 15.0,
             maxAmps = 30.0,
             stale = false,
             series = sampleHistory.batteryCurrent,
-            peakFraction = 0.87f,
             sparklineHeight = 36.dp,
-            maxArcHeight = 48.dp,
-            strokeWidth = 10.dp,
         )
     }
 }
