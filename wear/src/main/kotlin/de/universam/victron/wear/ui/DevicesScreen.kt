@@ -95,6 +95,29 @@ fun DevicesScreen(
         item { ListHeader { Text(stringResource(R.string.settings_title)) } }
 
         item {
+            val keepMinutes = collect(viewModel.keepScreenOnMinutes)
+            Button(
+                onClick = {
+                    val next = when (keepMinutes) {
+                        0 -> 2; 2 -> 5; 5 -> 10; else -> 0
+                    }
+                    viewModel.setKeepScreenOnMinutes(next)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = if (keepMinutes == 0) {
+                        stringResource(R.string.keep_screen_off)
+                    } else {
+                        stringResource(R.string.keep_screen_on_min, keepMinutes)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                )
+            }
+        }
+
+        item {
             Button(onClick = { viewModel.syncNow() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_sync), maxLines = 2)
             }

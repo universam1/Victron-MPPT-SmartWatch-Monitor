@@ -52,4 +52,6 @@
 
     <string name="action_sync">Sync with phone</string>
     <string name="sync_hint">Keys entered in the phone app arrive here automatically.</string>
+    <string name="keep_screen_off">Screen: auto off</string>
+    <string name="keep_screen_on_min">Screen on: %1$d min</string>
 </resources>

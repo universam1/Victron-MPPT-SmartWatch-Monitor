@@ -52,4 +52,6 @@
 
     <string name="action_sync">Mit Handy synchronisieren</string>
     <string name="sync_hint">In der Handy-App eingegebene Schlüssel landen automatisch hier.</string>
+    <string name="keep_screen_off">Display: automatisch aus</string>
+    <string name="keep_screen_on_min">Display an: %1$d Min.</string>
 </resources>

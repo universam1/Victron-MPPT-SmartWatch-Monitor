@@ -33,16 +33,16 @@ import de.universam.victron.data.VictronPalette
 import de.universam.victron.data.model.MetricSeries
 import de.universam.victron.mobile.R
 
-private const val START_ANGLE = 150f
-private const val SWEEP_ANGLE = 240f
+private const val START_ANGLE = 155f
+private const val SWEEP_ANGLE = 230f
 
 /** The battery current arc shares this circle — same geometry as on the watch. */
-private const val CURRENT_START_ANGLE = 38f
-private const val CURRENT_SWEEP_ANGLE = 104f
+private const val CURRENT_START_ANGLE = 45f
+private const val CURRENT_SWEEP_ANGLE = 90f
 
 /**
  * Height the gauge reserves, as a fraction of its circle's diameter. Both arcs together form a
- * near-complete ring: the PV arc (240°) fills the top and the current arc (104°) fills the bottom
+ * near-complete ring: the PV arc (230°) fills the top and the current arc (90°) fills the bottom
  * gap. The current arc's lowest point is at 90° (full radius below centre), so the box must be
  * nearly square. 0.96 leaves a small margin for the current arc's glow at the nadir while keeping
  * a slight height saving vs. a full square.
@@ -74,7 +74,7 @@ private val CURRENT_GRADIENT = listOf(
 
 /**
  * Large animated arc gauge showing PV power and battery current on the same circle — matching the
- * watch's ring layout where the 240° PV arc and the 104° current arc form a near-complete ring.
+ * watch's ring layout where the 230° PV arc and the 90° current arc share the same circle with 20° gaps.
  *
  * [peakFraction] marks the highest power in the trend window with a tick across the track — see
  * `DeviceSnapshot.pvPeakFraction`, which scales it by the same full scale as [fraction] so the tick

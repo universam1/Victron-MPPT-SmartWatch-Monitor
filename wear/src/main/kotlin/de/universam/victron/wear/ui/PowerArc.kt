@@ -20,9 +20,9 @@ import de.universam.victron.data.VictronPalette
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Default geometry: a 240° arc with the gap at the bottom (start at 7 o'clock). */
-private const val DEFAULT_START_ANGLE = 150f
-private const val DEFAULT_SWEEP_ANGLE = 240f
+/** Default geometry: a 230° arc with the gap at the bottom (start at 7 o'clock). */
+private const val DEFAULT_START_ANGLE = 155f
+private const val DEFAULT_SWEEP_ANGLE = 230f
 
 /** Thickness of the peak tick, as a share of the arc stroke it crosses. */
 private const val TICK_WIDTH_FRACTION = 0.15f

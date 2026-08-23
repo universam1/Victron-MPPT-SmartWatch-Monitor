@@ -99,7 +99,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   The observed peaks are all-time and persisted, and must stay that way — they are what scales an
   unknown model's gauge. Using them for the tick would pin it at last week's noon. Keep the
   asymmetry.
-- **`CurrentArcGauge` is text-only; its arc lives inside `PvArcGauge`.** The 104° current arc shares
+- **`CurrentArcGauge` is text-only; its arc lives inside `PvArcGauge`.** The 90° current arc shares
   the PV arc's circle (same centre, same radius, thinner stroke), drawn in the gap at the bottom.
   `CurrentArcGauge` provides only the label, value, and sparkline row beneath the combined gauge.
 - **The UI observes snapshots and history through `throttleLatest` (2 Hz), the repository does not.**
@@ -173,7 +173,7 @@ See [docs/architecture.md](docs/architecture.md); the wire format is in
   `maxArcHeight`/`strokeWidth`/`sparklineHeight` differ between them, never the composable. Don't
   fork them into two layouts that drift. Deriving the square gauge from the width in landscape is the bug this replaced.
 - **`PvArcGauge` reserves 0.96 of its diameter in height** (`ARC_HEIGHT_FRACTION`):
-  it draws both the 240° PV arc and the 104° battery current arc on the same circle (matching the
+  it draws both the 230° PV arc and the 90° battery current arc on the same circle (matching the
   watch's ring layout). The current arc fills the gap at the bottom, so the box is nearly square —
   0.96 leaves just enough margin for the current arc's glow at the nadir. The circle hangs from the
   top of the box — which is why the sweep gradient and the rotation pivot use the computed
@@ -209,9 +209,9 @@ The arc gauges paint a **sweep gradient along their length** (not a flat color):
 
 | Arc | Geometry | Gradient (start → tip) |
 |---|---|---|
-| PV power (wear + mobile) | 240°, starts 150° | `HEAT_LOW` white → `HEAT_MID_LOW` SOLAR yellow → `HEAT_MID` dark orange → `HEAT_HIGH` fire-red |
-| Battery current (wear) | 104°, starts 38° | `CURRENT_LOW` green → `CURRENT_MID` yellow-green → `CURRENT_HIGH` orange |
-| Battery current (mobile) | 104°, starts 38° — same circle as the PV arc inside `PvArcGauge` | same `CURRENT_*` stops when charging; flat `DISCHARGING` orange when the current is negative |
+| PV power (wear + mobile) | 230°, starts 155° | `HEAT_LOW` white → `HEAT_MID_LOW` SOLAR yellow → `HEAT_MID` dark orange → `HEAT_HIGH` fire-red |
+| Battery current (wear) | 90°, starts 45° | `CURRENT_LOW` green → `CURRENT_MID` yellow-green → `CURRENT_HIGH` orange |
+| Battery current (mobile) | 90°, starts 45° — same circle as the PV arc inside `PvArcGauge` | same `CURRENT_*` stops when charging; flat `DISCHARGING` orange when the current is negative |
 
 Four stops on the PV arc, not three: `HEAT_LOW` is white, and the SOLAR yellow is `HEAT_MID_LOW`.
 

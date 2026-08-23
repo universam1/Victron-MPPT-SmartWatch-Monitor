@@ -339,8 +339,8 @@ internal fun GaugeFace(
             trackColor = Color(VictronPalette.TRACK),
             modifier = Modifier.fillMaxSize(),
             strokeWidth = 11.dp,
-            startAngle = 38f,
-            sweepAngle = 104f,
+            startAngle = 45f,
+            sweepAngle = 90f,
             gradientColors = if (stale) null else listOf(
                 Color(VictronPalette.CURRENT_LOW),
                 Color(VictronPalette.CURRENT_MID),
