@@ -7,8 +7,8 @@
 #   ./build.sh apk-mobile     phone APK only
 #   ./build.sh apk-release    release APKs (see .github/workflows/release.yml for signing)
 #   ./build.sh lint           Android lint on both apps
-#   ./build.sh install-wear   install the watch APK on a connected/paired watch (adb)
-#   ./build.sh install-mobile install the phone APK
+#   ./build.sh install-wear   build release + install on connected watch (adb)
+#   ./build.sh install-mobile build release + install on phone
 #   ./build.sh screenshots     update screenshot test reference images
 #   ./build.sh shell          interactive shell inside the build container
 #   ./build.sh gradle <args>  run gradle with your own arguments
@@ -88,10 +88,12 @@ case "${1:-apk}" in
     install-wear)
         # adb runs on the host: the watch is paired with your machine, not with the container.
         # Wi-Fi debugging: adb connect <watch-ip>:5555 first.
-        adb install -r -t wear/build/outputs/apk/debug/wear-debug.apk
+        run_gradle :wear:assembleRelease
+        adb install -r wear/build/outputs/apk/release/wear-release.apk
         ;;
     install-mobile)
-        adb install -r -t mobile/build/outputs/apk/debug/mobile-debug.apk
+        run_gradle :mobile:assembleRelease
+        adb install -r mobile/build/outputs/apk/release/mobile-release.apk
         ;;
     shell)
         docker compose -f "$COMPOSE_FILE" run --rm build bash
